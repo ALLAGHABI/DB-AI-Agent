@@ -1,0 +1,31 @@
+{
+  "database": {
+    "type": "sqlite",
+    "host": "",
+    "port": "",
+    "database": "",
+    "username": "",
+    "password_encrypted": "",
+    "sqlite_file": "data/sample_store.db"
+  },
+  "ai": {
+    "api_key_encrypted": "",
+    "model": "anthropic/claude-3.5-sonnet",
+    "available_models": [
+      "anthropic/claude-3.5-sonnet",
+      "openai/gpt-4o",
+      "openai/gpt-4o-mini",
+      "google/gemini-pro",
+      "mistralai/mistral-7b-instruct",
+      "meta-llama/llama-3.1-70b-instruct"
+    ]
+  },
+  "ui": {
+    "theme": "dark",
+    "language": "ar"
+  },
+  "voice": {
+    "enabled": true,
+    "language": "ar-SA"
+  }
+}

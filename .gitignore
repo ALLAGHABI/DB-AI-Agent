@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env
+
+# Sensitive data & credentials
+data/.key
+data/settings.json
+data/schema_cache.json
+*.key
+.env
+.env.local
+
+# Logs
+server_log.txt
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build / Distribution
+build/
+dist/
+*.egg-info/
+
+# Test outputs
+test_result.md

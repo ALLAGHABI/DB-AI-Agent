@@ -44,6 +44,18 @@ def get_settings_view():
 
 # ---------- Database ----------
 
+@router.get("/status")
+def get_status():
+    """حالة الجلسة — تسمح للواجهة باستعادة الاتصال بعد إعادة التحميل."""
+    if not state.db.is_connected:
+        return {"db_connected": False, "dialect": None, "tables": []}
+    return {
+        "db_connected": True,
+        "dialect": state.db.dialect,
+        "tables": [t["name"] for t in state.db.schema_tables()],
+    }
+
+
 class ConnectIn(BaseModel):
     url: str
 

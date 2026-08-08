@@ -89,14 +89,39 @@ class DatabaseManager:
         insp = inspect(self.engine)
         out = []
         for table in insp.get_table_names():
+            try:
+                pks = insp.get_pk_constraint(table).get("constrained_columns", [])
+            except Exception:
+                pks = []
+            try:
+                fks = [
+                    {
+                        "constrained_columns": fk["constrained_columns"],
+                        "referred_table": fk["referred_table"],
+                        "referred_columns": fk["referred_columns"],
+                    }
+                    for fk in insp.get_foreign_keys(table)
+                ]
+            except Exception:
+                fks = []
+            with self.engine.connect() as conn:
+                count = conn.execute(
+                    text(f"SELECT COUNT(*) FROM {self._quote(table)}")
+                ).scalar_one()
             out.append({
                 "name": table,
                 "columns": [
                     {"name": c["name"], "type": str(c["type"]), "nullable": c["nullable"]}
                     for c in insp.get_columns(table)
                 ],
+                "primary_keys": pks,
+                "foreign_keys": fks,
+                "row_count": count,
             })
         return out
+
+    def _quote(self, ident: str) -> str:
+        return self.engine.dialect.identifier_preparer.quote(ident)
 
     def execute(self, sql: str, confirm_write: bool = False) -> ExecResult:
         if not self.is_connected:

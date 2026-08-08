@@ -1,5 +1,5 @@
 'use client';
-import { AlertTriangle, Cloud, Cpu, Play, Sparkles } from 'lucide-react';
+import { Cloud, Cpu, Play, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -7,11 +7,9 @@ import { api, type ExecResult, type GenerateResult } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { ConfirmWriteDialog } from './confirm-write-dialog';
 import type { ModelSelection } from './providers-panel';
 import { ResultsTable } from './results-table';
 
@@ -116,23 +114,9 @@ export function QueryWorkspace({ connected, selection }: {
         </CardContent>
       </Card>
 
-      <Dialog open={!!pendingWrite} onOpenChange={open => !open && setPendingWrite(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />{t('confirmTitle')}
-            </DialogTitle>
-            <DialogDescription>{t('confirmBody')}</DialogDescription>
-          </DialogHeader>
-          <pre dir="ltr" className="overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm">
-            {pendingWrite?.sql}
-          </pre>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setPendingWrite(null)}>{t('cancel')}</Button>
-            <Button variant="destructive" onClick={confirmWrite}>{t('confirmRun')}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmWriteDialog sql={pendingWrite?.sql ?? null}
+        onConfirm={confirmWrite}
+        onCancel={() => setPendingWrite(null)} />
     </>
   );
 }

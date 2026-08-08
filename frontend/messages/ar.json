@@ -1,6 +1,20 @@
 {
-  "app": { "name": "SmartDB", "tagline": "بياناتك لا تغادر جهازك" },
-  "status": { "connected": "متصل", "disconnected": "غير متصل", "local": "محلي", "cloud": "سحابي" },
+  "app": {
+    "name": "SmartDB",
+    "tagline": "بياناتك لا تغادر جهازك"
+  },
+  "status": {
+    "connected": "متصل",
+    "disconnected": "غير متصل",
+    "local": "محلي",
+    "cloud": "سحابي"
+  },
+  "nav": {
+    "query": "الاستعلام الذكي",
+    "tables": "الجداول",
+    "er": "المخطط",
+    "sql": "محرر SQL"
+  },
   "query": {
     "title": "ماذا تريد أن تعرف؟",
     "placeholder": "اكتب طلبك بالعربية أو الإنجليزية… مثال: أظهر أفضل 5 منتجات مبيعاً",
@@ -18,6 +32,44 @@
     "affected": "صفوف متأثرة",
     "needsSetup": "اتصل بقاعدة بيانات واختر نموذجاً للبدء",
     "emptyHint": "النتائج ستظهر هنا"
+  },
+  "tables": {
+    "pick": "اختر جدولاً",
+    "prev": "السابق",
+    "next": "التالي",
+    "addRow": "إضافة صف",
+    "add": "أضف",
+    "deleteSelected": "حذف المحدد",
+    "deleteConfirmTitle": "حذف الصفوف المحددة؟",
+    "deleteConfirmBody": "سيتم حذف {count} صف نهائياً.",
+    "editHint": "انقر مرتين على أي خلية للتعديل — Enter للحفظ، Esc للإلغاء",
+    "saved": "تم الحفظ",
+    "deleted": "تم الحذف",
+    "added": "تمت الإضافة",
+    "exportCsv": "تصدير CSV",
+    "exportXlsx": "تصدير Excel",
+    "import": "استيراد ملف",
+    "importTitle": "استيراد CSV / Excel / JSON",
+    "importTable": "اسم الجدول",
+    "importMode": "الوضع",
+    "importCreate": "إنشاء جدول جديد",
+    "importAppend": "إلحاق بجدول موجود",
+    "importRun": "استورد",
+    "imported": "استُورد {count} صف إلى {table}",
+    "backup": "نسخة احتياطية",
+    "noPk": "هذا الجدول بلا مفتاح أساسي — التحرير معطل",
+    "rows": "صف",
+    "cancel": "إلغاء"
+  },
+  "er": {
+    "empty": "اتصل بقاعدة بيانات لعرض المخطط",
+    "rows": "صف"
+  },
+  "sqlEditor": {
+    "run": "تنفيذ",
+    "running": "جارٍ التنفيذ…",
+    "placeholder": "-- اكتب SQL هنا",
+    "hint": "الاستعلامات المعدِّلة ستطلب تأكيداً قبل التنفيذ"
   },
   "connections": {
     "title": "قاعدة البيانات",

@@ -1,6 +1,20 @@
 {
-  "app": { "name": "SmartDB", "tagline": "Your data never leaves your machine" },
-  "status": { "connected": "Connected", "disconnected": "Disconnected", "local": "Local", "cloud": "Cloud" },
+  "app": {
+    "name": "SmartDB",
+    "tagline": "Your data never leaves your machine"
+  },
+  "status": {
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "local": "Local",
+    "cloud": "Cloud"
+  },
+  "nav": {
+    "query": "Smart Query",
+    "tables": "Tables",
+    "er": "Schema",
+    "sql": "SQL Editor"
+  },
   "query": {
     "title": "What do you want to know?",
     "placeholder": "Ask in Arabic or English… e.g. show top 5 selling products",
@@ -18,6 +32,44 @@
     "affected": "rows affected",
     "needsSetup": "Connect a database and pick a model to start",
     "emptyHint": "Results will appear here"
+  },
+  "tables": {
+    "pick": "Pick a table",
+    "prev": "Previous",
+    "next": "Next",
+    "addRow": "Add row",
+    "add": "Add",
+    "deleteSelected": "Delete selected",
+    "deleteConfirmTitle": "Delete selected rows?",
+    "deleteConfirmBody": "{count} rows will be permanently deleted.",
+    "editHint": "Double-click any cell to edit — Enter to save, Esc to cancel",
+    "saved": "Saved",
+    "deleted": "Deleted",
+    "added": "Added",
+    "exportCsv": "Export CSV",
+    "exportXlsx": "Export Excel",
+    "import": "Import file",
+    "importTitle": "Import CSV / Excel / JSON",
+    "importTable": "Table name",
+    "importMode": "Mode",
+    "importCreate": "Create new table",
+    "importAppend": "Append to existing",
+    "importRun": "Import",
+    "imported": "Imported {count} rows into {table}",
+    "backup": "Backup",
+    "noPk": "This table has no primary key — editing disabled",
+    "rows": "rows",
+    "cancel": "Cancel"
+  },
+  "er": {
+    "empty": "Connect a database to view the schema",
+    "rows": "rows"
+  },
+  "sqlEditor": {
+    "run": "Run",
+    "running": "Running…",
+    "placeholder": "-- Write SQL here",
+    "hint": "Modifying queries will ask for confirmation before running"
   },
   "connections": {
     "title": "Database",

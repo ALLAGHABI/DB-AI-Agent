@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Ollama يعمل على جهاز المضيف — الحاوية تصل إليه عبر host gateway
+      SMARTDB_OLLAMA_URL: http://host.docker.internal:11434
+      SMARTDB_CORS_ORIGINS: '["http://localhost:3000"]'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - smartdb-data:/data
+      - ./data:/app/data      # قواعد الديمو (sample_store.db)
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  smartdb-data:

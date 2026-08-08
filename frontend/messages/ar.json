@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "SmartDB",
-    "tagline": "بياناتك لا تغادر جهازك"
+    "tagline": "بياناتك لا تغادر جهازك",
+    "builtBy": "تطوير"
   },
   "status": {
     "connected": "متصل",

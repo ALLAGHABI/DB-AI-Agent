@@ -1,8 +1,16 @@
 'use client';
-import { Database } from 'lucide-react';
+import { Database, Github, Linkedin, Mail, Phone } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { LangThemeToggles } from './lang-theme-toggles';
+
+const AUTHOR = {
+  name: 'ALI ALLAGHABI',
+  phone: '+966551499154',
+  email: 'ALI.ALLAGHABI@gmail.com',
+  github: 'https://github.com/ALLAGHABI',
+  linkedin: 'https://www.linkedin.com/in/aliallaghabi/',
+};
 
 export function Shell({ sidebar, main, connected }: {
   sidebar: React.ReactNode; main: React.ReactNode; connected: boolean;
@@ -35,6 +43,25 @@ export function Shell({ sidebar, main, connected }: {
         <aside className="space-y-4">{sidebar}</aside>
         <main className="min-w-0 space-y-4">{main}</main>
       </div>
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-muted-foreground">
+          <span className="font-medium">{t('builtBy')} {AUTHOR.name}</span>
+          <div className="flex flex-wrap items-center gap-4" dir="ltr">
+            <a className="flex items-center gap-1.5 hover:text-foreground" href={`tel:${AUTHOR.phone}`}>
+              <Phone className="h-3.5 w-3.5" />{AUTHOR.phone}
+            </a>
+            <a className="flex items-center gap-1.5 hover:text-foreground" href={`mailto:${AUTHOR.email}`}>
+              <Mail className="h-3.5 w-3.5" />{AUTHOR.email}
+            </a>
+            <a className="flex items-center gap-1.5 hover:text-foreground" href={AUTHOR.github} target="_blank" rel="noreferrer">
+              <Github className="h-3.5 w-3.5" />GitHub
+            </a>
+            <a className="flex items-center gap-1.5 hover:text-foreground" href={AUTHOR.linkedin} target="_blank" rel="noreferrer">
+              <Linkedin className="h-3.5 w-3.5" />LinkedIn
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

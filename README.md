@@ -150,6 +150,12 @@ cd backend && .venv/bin/pytest
 - [x] Phase 4 — Docker, CI, docs
 - [ ] Hosted demo · query history · scheduled reports · NoSQL
 
+## 👤 Author · المطور
+
+**ALI ALLAGHABI**
+📧 [ALI.ALLAGHABI@gmail.com](mailto:ALI.ALLAGHABI@gmail.com) · 📱 +966551499154
+[GitHub](https://github.com/ALLAGHABI) · [LinkedIn](https://www.linkedin.com/in/aliallaghabi/)
+
 ## 📄 License
 
 [MIT](LICENSE) — built with ❤️ (and a local GPU) in Saudi Arabia.

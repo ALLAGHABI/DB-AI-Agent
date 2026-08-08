@@ -1,4 +1,5 @@
 """مسارات استوديو التقارير."""
+import asyncio
 import datetime
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -76,8 +77,10 @@ async def generate(body: GenerateIn):
         raise HTTPException(400, detail=str(e))
     xlsx = exporter.to_xlsx(profile, insights, body.language)
     try:
-        pdf = exporter.to_pdf(html)
-    except Exception:
+        # Playwright السنكروني لا يعمل داخل حلقة asyncio — ننقله إلى thread
+        pdf = await asyncio.to_thread(exporter.to_pdf, html)
+    except Exception as e:
+        print(f"PDF export failed: {e}")
         pdf = None
 
     meta = {

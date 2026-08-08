@@ -54,12 +54,22 @@ def _column_profile(name: str, s: pd.Series) -> dict:
     return base
 
 
+def _is_identifier(col: dict, total_rows: int) -> bool:
+    """أعمدة المعرفات (id) لا معنى لرسمها أو جمعها."""
+    name = col["name"].lower()
+    if name == "id" or name.endswith(("_id", "-id")) or name.startswith("id_"):
+        return True
+    return col["kind"] == "numeric" and total_rows > 0 and col["unique"] == total_rows
+
+
 def _charts(df: pd.DataFrame, columns: list[dict], max_charts: int) -> list[dict]:
     charts: list[dict] = []
+    total_rows = len(df)
 
-    # سلسلة زمنية: أول عمود تاريخ + أول عمود رقمي
+    # سلسلة زمنية: أول عمود تاريخ + أول عمود رقمي (مع استبعاد المعرفات)
     dt_cols = [c["name"] for c in columns if c["kind"] == "datetime"]
-    num_cols = [c["name"] for c in columns if c["kind"] == "numeric"]
+    num_cols = [c["name"] for c in columns
+                if c["kind"] == "numeric" and not _is_identifier(c, total_rows)]
     cat_cols = [c["name"] for c in columns
                 if c["kind"] == "categorical" and 1 < c["unique"] <= 30]
 

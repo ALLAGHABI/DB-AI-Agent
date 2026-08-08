@@ -82,3 +82,10 @@ def test_chart_specs_capped_and_typed():
 def test_json_serializable():
     import json
     json.dumps(profile_df(_df()))
+
+
+def test_identifier_columns_excluded_from_charts():
+    p = profile_df(_df())
+    titles = " ".join(c["title"] for c in p["charts"])
+    assert "order_id" not in titles          # عمود معرف — لا يُرسم
+    assert "amount" in titles                 # العمود الرقمي الحقيقي يُرسم

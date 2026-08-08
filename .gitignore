@@ -46,3 +46,5 @@ dist/
 
 # Test outputs
 test_result.md
+backend/.venv/
+backend/data/

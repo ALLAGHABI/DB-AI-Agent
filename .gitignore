@@ -48,3 +48,6 @@ dist/
 test_result.md
 backend/.venv/
 backend/data/
+
+# Private working notes (not part of the project)
+.private/

@@ -105,3 +105,56 @@ def test_insert_rejects_unknown_column(connected):
     r = connected.post("/api/db/table/products/rows",
                        json={"values": {"name": "x", "hack": 1}})
     assert r.status_code == 400
+
+
+# ---------- الاستيراد والتصدير والنسخ الاحتياطي ----------
+
+def _xlsx_bytes(rows):
+    import io
+
+    import openpyxl
+    wb = openpyxl.Workbook(); ws = wb.active
+    for row in rows:
+        ws.append(row)
+    buf = io.BytesIO(); wb.save(buf)
+    return buf.getvalue()
+
+
+def test_import_csv_new_table(connected):
+    csv = "name,qty\nقلم,4\nدفتر,9\n".encode()
+    r = connected.post("/api/db/import",
+                       files={"file": ("stock.csv", csv, "text/csv")},
+                       data={"table": "stock", "mode": "create"})
+    assert r.json()["inserted"] == 2
+    assert connected.get("/api/db/table/stock/rows").json()["total"] == 2
+
+
+def test_import_create_refuses_existing_table(connected):
+    csv = "a\n1\n".encode()
+    r = connected.post("/api/db/import",
+                       files={"file": ("x.csv", csv, "text/csv")},
+                       data={"table": "products", "mode": "create"})
+    assert r.status_code == 400
+
+
+def test_import_xlsx_append(connected):
+    data = _xlsx_bytes([["name", "qty"], ["مسطرة", 1]])
+    connected.post("/api/db/import", files={"file": ("s.xlsx", data, "application/x")},
+                   data={"table": "stock2", "mode": "create"})
+    r = connected.post("/api/db/import", files={"file": ("s.xlsx", data, "application/x")},
+                       data={"table": "stock2", "mode": "append"})
+    assert r.json()["inserted"] == 1
+    assert connected.get("/api/db/table/stock2/rows").json()["total"] == 2
+
+
+def test_export_csv_and_xlsx(connected):
+    r = connected.get("/api/db/table/products/export", params={"format": "csv"})
+    assert r.status_code == 200 and "كتاب أ" in r.text
+    r = connected.get("/api/db/table/products/export", params={"format": "xlsx"})
+    assert r.headers["content-type"].startswith("application/vnd.openxmlformats")
+
+
+def test_backup_sqlite(connected):
+    r = connected.get("/api/db/backup")
+    assert r.status_code == 200
+    assert r.content[:16] == b"SQLite format 3\x00"

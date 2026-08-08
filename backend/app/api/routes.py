@@ -1,9 +1,12 @@
+import urllib.parse
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response as FileResponse
 from pydantic import BaseModel
 
 from ..agent.nl2sql import build_prompt, extract_sql
+from ..db import transfer
 from ..db.manager import ExecutionBlocked
 from ..db.sql_guard import classify
 from ..state import state
@@ -148,6 +151,46 @@ def table_delete(table: str, body: DeleteIn):
     except Exception as e:
         raise HTTPException(400, detail=f"فشل الحذف: {e}")
     return {"success": True, "affected": affected}
+
+
+@router.post("/db/import")
+async def db_import(file: UploadFile = File(...), table: str = Form(...),
+                    mode: str = Form("create")):
+    _require_connection()
+    data = await file.read()
+    try:
+        df = transfer.read_upload(file.filename or "upload", data)
+        inserted = transfer.import_df(state.db, df, table, mode)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(400, detail=f"فشل الاستيراد: {e}")
+    return {"success": True, "inserted": inserted, "table": table}
+
+
+@router.get("/db/table/{table}/export")
+def db_export(table: str, format: str = "csv"):
+    _require_connection()
+    try:
+        data, media_type, filename = transfer.export_table(state.db, table, format)
+    except LookupError as e:
+        raise HTTPException(404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    quoted = urllib.parse.quote(filename)
+    return FileResponse(content=data, media_type=media_type, headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quoted}"})
+
+
+@router.get("/db/backup")
+def db_backup():
+    _require_connection()
+    try:
+        data = transfer.sqlite_backup(state.db)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    return FileResponse(content=data, media_type="application/vnd.sqlite3", headers={
+        "Content-Disposition": "attachment; filename=backup.db"})
 
 
 class ExecuteIn(BaseModel):

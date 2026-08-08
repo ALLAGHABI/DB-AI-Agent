@@ -1,0 +1,50 @@
+{
+  "app": { "name": "SmartDB", "tagline": "بياناتك لا تغادر جهازك" },
+  "status": { "connected": "متصل", "disconnected": "غير متصل", "local": "محلي", "cloud": "سحابي" },
+  "query": {
+    "title": "ماذا تريد أن تعرف؟",
+    "placeholder": "اكتب طلبك بالعربية أو الإنجليزية… مثال: أظهر أفضل 5 منتجات مبيعاً",
+    "run": "نفّذ",
+    "generating": "جارٍ توليد SQL…",
+    "running": "جارٍ التنفيذ…",
+    "confirmTitle": "استعلام يعدّل البيانات",
+    "confirmBody": "راجع الاستعلام قبل التنفيذ — هذا الإجراء سيغيّر بياناتك.",
+    "confirmRun": "نفّذ على مسؤوليتي",
+    "cancel": "إلغاء",
+    "results": "النتائج",
+    "sql": "SQL",
+    "noResults": "لا توجد نتائج",
+    "rows": "صف",
+    "affected": "صفوف متأثرة",
+    "needsSetup": "اتصل بقاعدة بيانات واختر نموذجاً للبدء",
+    "emptyHint": "النتائج ستظهر هنا"
+  },
+  "connections": {
+    "title": "قاعدة البيانات",
+    "type": "النوع",
+    "sqlitePath": "مسار ملف SQLite",
+    "sample": "استخدم القاعدة التجريبية",
+    "host": "المضيف",
+    "port": "المنفذ",
+    "database": "القاعدة",
+    "username": "المستخدم",
+    "password": "كلمة المرور",
+    "connect": "اتصال",
+    "connecting": "جارٍ الاتصال…",
+    "connectedTables": "الجداول",
+    "connectSuccess": "تم الاتصال بنجاح"
+  },
+  "settings": {
+    "title": "نموذج الذكاء الاصطناعي",
+    "localFirst": "النماذج المحلية أولاً — السحابة خيار ثانٍ",
+    "provider": "المزود",
+    "openrouterKey": "مفتاح OpenRouter (اختياري)",
+    "keySaved": "المفتاح محفوظ ✓",
+    "compatUrl": "عنوان خادم متوافق OpenAI (اختياري)",
+    "save": "حفظ",
+    "saved": "تم الحفظ",
+    "model": "النموذج",
+    "ollamaMissing": "Ollama غير مشغّل — حمّله من ollama.com ثم: ollama pull gemma3",
+    "refresh": "تحديث"
+  }
+}

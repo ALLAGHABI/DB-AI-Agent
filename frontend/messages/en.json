@@ -1,0 +1,50 @@
+{
+  "app": { "name": "SmartDB", "tagline": "Your data never leaves your machine" },
+  "status": { "connected": "Connected", "disconnected": "Disconnected", "local": "Local", "cloud": "Cloud" },
+  "query": {
+    "title": "What do you want to know?",
+    "placeholder": "Ask in Arabic or English… e.g. show top 5 selling products",
+    "run": "Run",
+    "generating": "Generating SQL…",
+    "running": "Running…",
+    "confirmTitle": "This query modifies data",
+    "confirmBody": "Review the SQL before running — this will change your data.",
+    "confirmRun": "Run anyway",
+    "cancel": "Cancel",
+    "results": "Results",
+    "sql": "SQL",
+    "noResults": "No results",
+    "rows": "rows",
+    "affected": "rows affected",
+    "needsSetup": "Connect a database and pick a model to start",
+    "emptyHint": "Results will appear here"
+  },
+  "connections": {
+    "title": "Database",
+    "type": "Type",
+    "sqlitePath": "SQLite file path",
+    "sample": "Use sample database",
+    "host": "Host",
+    "port": "Port",
+    "database": "Database",
+    "username": "Username",
+    "password": "Password",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "connectedTables": "Tables",
+    "connectSuccess": "Connected successfully"
+  },
+  "settings": {
+    "title": "AI Model",
+    "localFirst": "Local models first — cloud is opt-in",
+    "provider": "Provider",
+    "openrouterKey": "OpenRouter key (optional)",
+    "keySaved": "Key saved ✓",
+    "compatUrl": "OpenAI-compatible server URL (optional)",
+    "save": "Save",
+    "saved": "Saved",
+    "model": "Model",
+    "ollamaMissing": "Ollama is not running — get it from ollama.com then: ollama pull gemma3",
+    "refresh": "Refresh"
+  }
+}

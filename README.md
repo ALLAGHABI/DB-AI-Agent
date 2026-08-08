@@ -1,73 +1,58 @@
-# DB-AI-Agent 🤖
-## وكيل قاعدة البيانات الذكي
+# SmartDB — AI Database Manager
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-2.0+-green.svg)](https://flask.palletsprojects.com)
-[![OpenRouter](https://img.shields.io/badge/OpenRouter-AI-orange.svg)](https://openrouter.ai)
+**بياناتك لا تغادر جهازك · Your data never leaves your machine**
 
----
+منصة ثنائية اللغة (عربي/إنجليزي) لإدارة قواعد البيانات بالذكاء الاصطناعي — **بالنماذج المحلية أولاً**.
+اسأل قاعدة بياناتك بلغتك الطبيعية، وSmartDB يولّد SQL وينفذه بأمان.
 
-## 📋 **نظرة عامة**
+A bilingual (Arabic/English) local-first AI database manager. Ask your database in natural
+language — SmartDB generates the SQL and runs it safely.
 
-DB-AI-Agent هو تطبيق ذكي متقدم يتيح لك التفاعل مع قواعد البيانات باستخدام **اللغة الطبيعية العربية والإنجليزية**. يحول طلباتك تلقائياً إلى استعلامات SQL دقيقة باستخدام أحدث نماذج الذكاء الاصطناعي.
+> 🚧 **Phase 1 of 4** — see [`docs/superpowers/specs/`](docs/superpowers/specs/) for the roadmap
+> (DB management suite, reports studio, Docker & publishing coming next).
 
-### ✨ **المميزات الرئيسية**
-- 🤖 **ذكاء اصطناعي متقدم:** دعم 7 نماذج AI مختلفة (Claude, GPT-4, Gemini, Llama)
-- 🌍 **دعم اللغة العربية:** واجهة عربية كاملة مع معالجة متقدمة للنصوص العربية
-- 🗄️ **قواعد بيانات متعددة:** SQLite, MySQL, PostgreSQL
-- 🔒 **أمان متقدم:** تشفير محلي للإعدادات وكلمات المرور
-- 💾 **حفظ تلقائي:** الإعدادات محفوظة في المتصفح
-- 🎯 **سهولة الاستخدام:** واجهة ويب بديهية وسريعة الاستجابة
+## ✨ Features
 
----
+- 🖥️ **Local models first** — auto-detects [Ollama](https://ollama.com) and lists your installed
+  models; any OpenAI-compatible server (LM Studio, vLLM) works too. Cloud (OpenRouter) is opt-in.
+- 🛡️ **Safe by design** — SQL is parsed with `sqlglot`; anything that modifies data shows a
+  **confirmation dialog before execution**. Unbounded SELECTs get an automatic LIMIT.
+- 🌍 **Bilingual UI** — full Arabic (RTL) and English (LTR) with one-click switching, dark & light themes.
+- 🔐 **No secret leaks** — API keys are encrypted at rest and never returned to the browser;
+  the server binds to `127.0.0.1` only.
+- 🗄️ SQLite, MySQL, and PostgreSQL (drivers included).
 
-## 🚀 **التثبيت السريع**
+## 🚀 Quickstart
 
-### 1. **استنساخ المشروع:**
+Requirements: Python 3.10+, Node 20+ with `pnpm`, and [Ollama](https://ollama.com) running
+(`ollama pull gemma3:4b` is a good start).
+
 ```bash
-git clone <repository-url>
-cd DB-AI-Agent
+# Backend
+cd backend
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+
+# Frontend
+cd ../frontend
+pnpm install
+
+# Run both (from repo root)
+./scripts/dev.sh
 ```
 
-### 2. **تثبيت المتطلبات:**
+Open <http://localhost:3000>, connect to `data/sample_store.db`, pick a model, and ask:
+*"أظهر أفضل 5 منتجات مبيعاً"*.
+
+## 🧪 Tests
+
 ```bash
-pip install -r requirements.txt
+cd backend && .venv/bin/pytest
 ```
 
-### 3. **تشغيل التطبيق:**
-```bash
-python main.py
-```
-
-### 📁 **هيكل المشروع**
+## 🏗️ Architecture
 
 ```
-DB-AI-Agent/
-├── main.py                 # نقطة البداية الرئيسية
-├── app/
-│   ├── __init__.py
-│   ├── ui.py              # واجهة المستخدم
-│   ├── database_handler.py # إدارة قواعد البيانات
-│   ├── ai_agent.py        # وكيل الذكاء الاصطناعي
-│   └── settings_manager.py # إدارة الإعدادات
-├── utils/
-│   ├── __init__.py
-│   └── voice_recognition.py # التعرف على الصوت
-├── data/
-│   ├── settings.json      # ملف الإعدادات
-│   └── query_history.db   # تاريخ الاستعلامات
-└── requirements.txt       # المكتبات المطلوبة
+backend/   FastAPI · app/llm (Ollama, OpenAI-compat, OpenRouter) · app/db (sqlglot guard)
+           · app/agent (NL→SQL) · app/api (REST)
+frontend/  Next.js · TypeScript · Tailwind · shadcn/ui · next-intl (ar/en) · next-themes
 ```
-
-## الاستخدام
-
-1. قم بتكوين اتصال قاعدة البيانات من صفحة الإعدادات
-2. أدخل مفتاح OpenRouter API
-3. اختر نموذج الذكاء الاصطناعي المفضل
-4. ابدأ في كتابة أو تسجيل أوامرك باللغة الطبيعية
-
-## المتطلبات
-
-- Python 3.8+
-- مفتاح OpenRouter API
-- اتصال بالإنترنت للذكاء الاصطناعي

@@ -5,6 +5,7 @@ import { ConnectionsPanel } from '@/components/connections-panel';
 import { ErDiagram } from '@/components/er-diagram';
 import { ProvidersPanel, type ModelSelection } from '@/components/providers-panel';
 import { QueryWorkspace } from '@/components/query-workspace';
+import { ReportsStudio } from '@/components/reports-studio';
 import { Shell } from '@/components/shell';
 import { SqlEditor } from '@/components/sql-editor';
 import { TablesBrowser } from '@/components/tables-browser';
@@ -45,6 +46,7 @@ export default function Home() {
             <TabsTrigger value="tables">{t('tables')}</TabsTrigger>
             <TabsTrigger value="er">{t('er')}</TabsTrigger>
             <TabsTrigger value="sql">{t('sql')}</TabsTrigger>
+            <TabsTrigger value="reports">{t('reports')}</TabsTrigger>
           </TabsList>
           <TabsContent value="query" className="space-y-4">
             <QueryWorkspace connected={connected} selection={selection} />
@@ -57,6 +59,9 @@ export default function Home() {
           </TabsContent>
           <TabsContent value="sql">
             <SqlEditor connected={connected} />
+          </TabsContent>
+          <TabsContent value="reports">
+            <ReportsStudio selection={selection} />
           </TabsContent>
         </Tabs>
       }

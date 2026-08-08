@@ -13,7 +13,8 @@
     "query": "الاستعلام الذكي",
     "tables": "الجداول",
     "er": "المخطط",
-    "sql": "محرر SQL"
+    "sql": "محرر SQL",
+    "reports": "التقارير"
   },
   "query": {
     "title": "ماذا تريد أن تعرف؟",
@@ -98,5 +99,37 @@
     "model": "النموذج",
     "ollamaMissing": "Ollama غير مشغّل — حمّله من ollama.com ثم: ollama pull gemma3",
     "refresh": "تحديث"
+  },
+  "reports": {
+    "title": "استوديو التقارير",
+    "uploadHint": "ارفع ملف CSV أو Excel أو JSON لتحليله",
+    "pickFile": "اختر ملفاً",
+    "analyzing": "جارٍ التحليل…",
+    "profileTitle": "نظرة على البيانات",
+    "rows": "صف",
+    "cols": "عمود",
+    "missing": "قيم مفقودة",
+    "duplicates": "مكرر",
+    "columnsChips": "الأعمدة",
+    "reportTitle": "عنوان التقرير",
+    "template": "القالب",
+    "tExecutive": "تنفيذي مختصر",
+    "tDetailed": "تفصيلي",
+    "tDashboard": "لوحة مؤشرات",
+    "language": "لغة التقرير",
+    "arabic": "العربية",
+    "english": "English",
+    "generate": "ولّد التقرير",
+    "generating": "النموذج المحلي يكتب التقرير…",
+    "needModel": "اختر نموذجاً من الشريط الجانبي أولاً",
+    "archive": "أرشيف التقارير",
+    "empty": "لا توجد تقارير بعد — ارفع ملفاً وولّد أول تقرير",
+    "view": "عرض",
+    "delete": "حذف",
+    "deleteConfirm": "حذف هذا التقرير نهائياً؟",
+    "generated": "تم توليد التقرير",
+    "localBadge": "محلي",
+    "cloudBadge": "سحابي",
+    "cancel": "إلغاء"
   }
 }

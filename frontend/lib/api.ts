@@ -78,4 +78,31 @@ export const api = {
   exportUrl: (table: string, fmt: 'csv' | 'xlsx') =>
     `/api/db/table/${encodeURIComponent(table)}/export?format=${fmt}`,
   backupUrl: () => '/api/db/backup',
+
+  reportAnalyze: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return fetch('/api/reports/analyze', { method: 'POST', body: fd })
+      .then(r => j<{ token: string; profile: ReportProfile }>(r));
+  },
+  reportGenerate: (body: {
+    token: string; title: string; template: string; language: string;
+    provider: string; model: string;
+  }) => post('/api/reports/generate', body).then(r => j<ReportMeta>(r)),
+  reportsList: () => fetch('/api/reports').then(r => j<ReportMeta[]>(r)),
+  reportDelete: (id: string) =>
+    fetch(`/api/reports/${id}`, { method: 'DELETE' }).then(r => j<{ success: boolean }>(r)),
+  reportFileUrl: (id: string, kind: 'html' | 'pdf' | 'xlsx') => `/api/reports/${id}/${kind}`,
+};
+
+export type ReportProfile = {
+  overview: { rows: number; cols: number; missing_pct: number; duplicate_rows: number; memory_kb: number };
+  columns: { name: string; kind: string; nulls: number; unique: number }[];
+  correlations: { a: string; b: string; r: number }[];
+  charts: { type: string; title: string }[];
+};
+export type ReportMeta = {
+  id: string; title: string; template: string; language: string;
+  source_name: string; model_label: string; created_at: string;
+  is_local: boolean; rows: number; cols: number; pdf: boolean;
 };

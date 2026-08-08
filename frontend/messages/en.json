@@ -13,7 +13,8 @@
     "query": "Smart Query",
     "tables": "Tables",
     "er": "Schema",
-    "sql": "SQL Editor"
+    "sql": "SQL Editor",
+    "reports": "Reports"
   },
   "query": {
     "title": "What do you want to know?",
@@ -98,5 +99,37 @@
     "model": "Model",
     "ollamaMissing": "Ollama is not running — get it from ollama.com then: ollama pull gemma3",
     "refresh": "Refresh"
+  },
+  "reports": {
+    "title": "Reports Studio",
+    "uploadHint": "Upload a CSV, Excel, or JSON file to analyze",
+    "pickFile": "Choose file",
+    "analyzing": "Analyzing…",
+    "profileTitle": "Data overview",
+    "rows": "rows",
+    "cols": "columns",
+    "missing": "missing",
+    "duplicates": "duplicates",
+    "columnsChips": "Columns",
+    "reportTitle": "Report title",
+    "template": "Template",
+    "tExecutive": "Executive brief",
+    "tDetailed": "Detailed",
+    "tDashboard": "Dashboard",
+    "language": "Report language",
+    "arabic": "العربية",
+    "english": "English",
+    "generate": "Generate report",
+    "generating": "Local model is writing the report…",
+    "needModel": "Pick a model from the sidebar first",
+    "archive": "Reports archive",
+    "empty": "No reports yet — upload a file and generate your first one",
+    "view": "View",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this report permanently?",
+    "generated": "Report generated",
+    "localBadge": "Local",
+    "cloudBadge": "Cloud",
+    "cancel": "Cancel"
   }
 }

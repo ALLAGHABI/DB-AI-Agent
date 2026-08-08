@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "SmartDB",
-    "tagline": "Your data never leaves your machine"
+    "tagline": "Your data never leaves your machine",
+    "builtBy": "Built by"
   },
   "status": {
     "connected": "Connected",

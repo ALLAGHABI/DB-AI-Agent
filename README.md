@@ -4,7 +4,7 @@
 
 **بياناتك لا تغادر جهازك · Your data never leaves your machine**
 
-[![CI](https://github.com/ALLAGHABI/smartdb/actions/workflows/ci.yml/badge.svg)](../../actions)
+[![CI](https://github.com/ALLAGHABI/DB-AI-Agent/actions/workflows/ci.yml/badge.svg)](../../actions)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)](https://nextjs.org)

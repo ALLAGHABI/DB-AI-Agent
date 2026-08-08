@@ -38,11 +38,15 @@ def main():
             "sql": "SELECT name, price FROM products ORDER BY price DESC"})
         page.get_by_role("tab", name="محرر SQL").click()
         page.locator(".cm-content").click()
+        page.keyboard.press("Meta+a")          # مسح المحتوى الافتراضي أولاً
+        page.keyboard.press("Delete")
         page.keyboard.type("SELECT c.name, c.city, COUNT(o.id) AS orders\n"
                            "FROM customers c JOIN orders o ON o.customer_id = c.id\n"
                            "GROUP BY c.id ORDER BY orders DESC")
+        page.keyboard.press("Escape")          # إغلاق الإكمال التلقائي
         page.get_by_role("button", name="تنفيذ").click()
-        page.wait_for_timeout(1200)
+        page.wait_for_selector("table")        # انتظار جدول النتائج
+        page.wait_for_timeout(4500)            # زوال أي toast
         shot(page, "sql-editor-ar-dark")
 
         # 2) الجداول

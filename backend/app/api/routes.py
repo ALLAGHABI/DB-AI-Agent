@@ -77,6 +77,79 @@ def db_schema():
     return {"tables": state.db.schema_tables()}
 
 
+def _require_connection():
+    if not state.db.is_connected:
+        raise HTTPException(400, detail="لا يوجد اتصال")
+
+
+@router.get("/db/table/{table}/rows")
+def table_rows(table: str, limit: int = 50, offset: int = 0,
+               order_by: str | None = None, dir: str = "asc"):
+    _require_connection()
+    try:
+        return state.db.browse_rows(table, limit=limit, offset=offset,
+                                    order_by=order_by, direction=dir)
+    except LookupError as e:
+        raise HTTPException(404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+
+
+class InsertIn(BaseModel):
+    values: dict
+
+
+@router.post("/db/table/{table}/rows")
+def table_insert(table: str, body: InsertIn):
+    _require_connection()
+    try:
+        pk = state.db.insert_row(table, body.values)
+    except LookupError as e:
+        raise HTTPException(404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(400, detail=f"فشل الإدراج: {e}")
+    return {"success": True, "pk": pk}
+
+
+class UpdateIn(BaseModel):
+    pk: dict
+    values: dict
+
+
+@router.put("/db/table/{table}/rows")
+def table_update(table: str, body: UpdateIn):
+    _require_connection()
+    try:
+        affected = state.db.update_row(table, body.pk, body.values)
+    except LookupError as e:
+        raise HTTPException(404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(400, detail=f"فشل التعديل: {e}")
+    return {"success": True, "affected": affected}
+
+
+class DeleteIn(BaseModel):
+    pk: dict
+
+
+@router.delete("/db/table/{table}/rows")
+def table_delete(table: str, body: DeleteIn):
+    _require_connection()
+    try:
+        affected = state.db.delete_row(table, body.pk)
+    except LookupError as e:
+        raise HTTPException(404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(400, detail=f"فشل الحذف: {e}")
+    return {"success": True, "affected": affected}
+
+
 class ExecuteIn(BaseModel):
     sql: str
     confirm_write: bool = False

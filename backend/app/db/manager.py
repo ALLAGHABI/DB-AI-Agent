@@ -123,6 +123,93 @@ class DatabaseManager:
     def _quote(self, ident: str) -> str:
         return self.engine.dialect.identifier_preparer.quote(ident)
 
+    # ---------- تصفح وتحرير الجداول (أسماء مُتحقق منها ضد المخطط دائماً) ----------
+
+    def _table_meta(self, table: str) -> dict:
+        insp = inspect(self.engine)
+        if table not in insp.get_table_names():
+            raise LookupError(f"جدول غير موجود: {table}")
+        cols = [c["name"] for c in insp.get_columns(table)]
+        try:
+            pks = insp.get_pk_constraint(table).get("constrained_columns", [])
+        except Exception:
+            pks = []
+        return {"columns": cols, "primary_keys": pks}
+
+    def browse_rows(self, table: str, limit: int = 50, offset: int = 0,
+                    order_by: str | None = None, direction: str = "asc") -> dict:
+        meta = self._table_meta(table)
+        if order_by is not None and order_by not in meta["columns"]:
+            raise ValueError(f"عمود غير معروف للفرز: {order_by}")
+        if direction not in ("asc", "desc"):
+            raise ValueError("اتجاه الفرز يجب أن يكون asc أو desc")
+        qt = self._quote(table)
+        order_sql = f" ORDER BY {self._quote(order_by)} {direction.upper()}" if order_by else ""
+        with self.engine.connect() as conn:
+            total = conn.execute(text(f"SELECT COUNT(*) FROM {qt}")).scalar_one()
+            result = conn.execute(
+                text(f"SELECT * FROM {qt}{order_sql} LIMIT :l OFFSET :o"),
+                {"l": min(limit, settings.row_limit), "o": max(offset, 0)},
+            )
+            return {
+                "columns": list(result.keys()),
+                "rows": [list(r) for r in result.fetchall()],
+                "total": total,
+                "primary_keys": meta["primary_keys"],
+            }
+
+    def _validate_columns(self, meta: dict, values: dict, what: str) -> None:
+        unknown = set(values) - set(meta["columns"])
+        if unknown:
+            raise ValueError(f"أعمدة غير معروفة في {what}: {', '.join(sorted(unknown))}")
+        if not values:
+            raise ValueError(f"{what} فارغ")
+
+    def insert_row(self, table: str, values: dict) -> dict:
+        meta = self._table_meta(table)
+        self._validate_columns(meta, values, "القيم")
+        cols = ", ".join(self._quote(c) for c in values)
+        binds = ", ".join(f":{c}" for c in values)
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text(f"INSERT INTO {self._quote(table)} ({cols}) VALUES ({binds})"), values)
+            conn.commit()
+            pk: dict = {}
+            if len(meta["primary_keys"]) == 1:
+                pk_col = meta["primary_keys"][0]
+                pk[pk_col] = values.get(pk_col,
+                                        getattr(result, "lastrowid", None))
+            return pk
+
+    def _pk_where(self, meta: dict, pk: dict) -> str:
+        if not meta["primary_keys"]:
+            raise ValueError("الجدول بلا مفتاح أساسي — التحرير غير مدعوم")
+        if set(pk) != set(meta["primary_keys"]):
+            raise ValueError("يجب تحديد قيم المفتاح الأساسي كاملة")
+        return " AND ".join(f"{self._quote(c)} = :pk_{c}" for c in pk)
+
+    def update_row(self, table: str, pk: dict, values: dict) -> int:
+        meta = self._table_meta(table)
+        self._validate_columns(meta, values, "القيم")
+        where = self._pk_where(meta, pk)
+        sets = ", ".join(f"{self._quote(c)} = :{c}" for c in values)
+        params = {**values, **{f"pk_{c}": v for c, v in pk.items()}}
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text(f"UPDATE {self._quote(table)} SET {sets} WHERE {where}"), params)
+            conn.commit()
+            return result.rowcount
+
+    def delete_row(self, table: str, pk: dict) -> int:
+        meta = self._table_meta(table)
+        where = self._pk_where(meta, pk)
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text(f"DELETE FROM {self._quote(table)} WHERE {where}"),
+                {f"pk_{c}": v for c, v in pk.items()})
+            conn.commit()
+            return result.rowcount
+
     def execute(self, sql: str, confirm_write: bool = False) -> ExecResult:
         if not self.is_connected:
             raise RuntimeError("لا يوجد اتصال بقاعدة البيانات")

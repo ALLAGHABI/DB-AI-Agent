@@ -52,3 +52,27 @@ def test_write_executes_with_confirm(db_path):
     m = DatabaseManager(); m.connect(f"sqlite:///{db_path}")
     res = m.execute("DELETE FROM customers WHERE name='سارة'", confirm_write=True)
     assert res.kind == "affected" and res.affected == 1
+
+
+def test_sqlite_missing_file_rejected(tmp_path):
+    """يجب رفض ملف SQLite غير موجود بدل إنشاء قاعدة فارغة بصمت."""
+    m = DatabaseManager()
+    missing = tmp_path / "nope.db"
+    with pytest.raises(FileNotFoundError):
+        m.connect(f"sqlite:///{missing}")
+    assert not missing.exists()          # لم يُنشأ ملف فارغ
+    assert m.is_connected is False
+
+
+def test_sqlite_relative_path_resolved_from_search_paths(db_path, tmp_path, monkeypatch):
+    """المسار النسبي يُحل عبر مسارات البحث (مجلد التشغيل ثم جذر المشروع)."""
+    import os
+    import shutil
+    root = tmp_path / "repo"; (root / "data").mkdir(parents=True)
+    shutil.copy(db_path, root / "data" / "store.db")
+    workdir = root / "backend"; workdir.mkdir()
+    monkeypatch.chdir(workdir)
+    m = DatabaseManager()
+    m.connect("sqlite:///data/store.db")   # موجود في ../data نسبةً لمجلد التشغيل
+    assert m.is_connected
+    assert "customers" in m.schema_summary()

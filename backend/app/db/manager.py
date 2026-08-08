@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -7,6 +8,24 @@ from ..config import settings
 from .sql_guard import SqlClass, classify, ensure_limit
 
 _DIALECTS = {"sqlite": "sqlite", "mysql": "mysql", "postgresql": "postgres"}
+
+
+def _resolve_sqlite_url(url: str) -> str:
+    """يتحقق من وجود ملف SQLite ويحل المسارات النسبية.
+
+    SQLAlchemy ينشئ ملفاً فارغاً بصمت إن لم يكن موجوداً — نرفض ذلك،
+    ونبحث عن المسار النسبي في مجلد التشغيل ثم في المجلد الأب (جذر المشروع).
+    """
+    path = url[len("sqlite:///"):]
+    if os.path.isabs(path):
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"ملف قاعدة البيانات غير موجود: {path}")
+        return url
+    for base in (os.getcwd(), os.path.dirname(os.getcwd())):
+        candidate = os.path.join(base, path)
+        if os.path.exists(candidate):
+            return f"sqlite:///{os.path.abspath(candidate)}"
+    raise FileNotFoundError(f"ملف قاعدة البيانات غير موجود: {path}")
 
 
 class ExecutionBlocked(Exception):
@@ -37,6 +56,8 @@ class DatabaseManager:
         return self.engine is not None
 
     def connect(self, url: str) -> None:
+        if url.startswith("sqlite:///"):
+            url = _resolve_sqlite_url(url)
         engine = create_engine(url)
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))

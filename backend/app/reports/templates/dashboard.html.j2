@@ -5,7 +5,7 @@
 @page { size: A4 landscape; margin: 9mm; }
 .appbar {
   background: linear-gradient(120deg, var(--brand-deep), #065f46);
-  color: #fff; padding: 15px 22px; position: relative; overflow: hidden;
+  color: #fff; padding: 15px 22px 38px; position: relative; overflow: hidden;
 }
 .appbar::after {
   content: ''; position: absolute; inset: 0; opacity: .07;
@@ -35,9 +35,14 @@
   flex-basis: calc((var(--span, 12) / 12) * (100% + var(--gap)) - var(--gap));
   min-width: 0;
 }
-/* شريط المؤشرات يوزّع نفسه على عرضه مهما كان عددها — لا خانات معلّقة */
-.kpi-strip { display: flex; flex-wrap: wrap; gap: 14px; }
+/* شريط المؤشرات يوزّع نفسه على عرضه مهما كان عددها — لا خانات معلّقة.
+   ويُرفع ليجلس على حافة الشريط الأخضر: 16px تُلغي حشو .wrap و26px هي الارتفاع. */
+.kpi-strip {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  margin-top: -42px; position: relative; z-index: 2;
+}
 .kpi-strip > * { flex: 1 1 155px; }
+.kpi-strip .kpi { box-shadow: 0 3px 12px rgb(15 23 42 / .1); }
 .block { margin-bottom: 14px; }
 .block:empty { display: none; margin: 0; }
 .rail { --span: 4; }
@@ -80,14 +85,14 @@
 </header>
 
 <div class="wrap">
-  {% if 'summary' in sections and insights.summary %}
-  <div class="strap">{{ insights.summary }}</div>
-  {% endif %}
-
   {# كل كتلة شبكة مستقلة: Chromium يقسّم شبكةً واحدة عبر صفحتين تقسيماً خاطئاً
      فتتراكب البطاقات في PDF — الفصل يجعل الفاصل بين الكتل لا داخلها. #}
   {% if kpis %}
   <div class="kpi-strip block">{% for k in kpis[:6] %}{{ m.kpi_card(k) }}{% endfor %}</div>
+  {% endif %}
+
+  {% if 'summary' in sections and insights.summary %}
+  <div class="strap">{{ insights.summary }}</div>
   {% endif %}
 
   {% if hero or ('findings' in sections and insights.findings) %}

@@ -9,13 +9,15 @@ _T = {
         "covers": "يغطي هذا التقرير {records} سجلاً من {subject}.",
         "total": "بلغ إجمالي {measure} {total}، بمتوسط {average} لكل سجل، وأعلى قيمة {highest}.",
         "period": "تمتد البيانات من {start} إلى {end}.",
-        "rose": "ارتفع {measure} من {first} إلى {last} بنسبة {pct}%.",
-        "fell": "انخفض {measure} من {first} إلى {last} بنسبة {pct}%.",
-        "steady": "استقر {measure} عند مستوى {last} تقريباً.",
+        # «مؤشر» رأسٌ مذكّر يجعل الفعل صحيحاً مع أي تسمية (التكلفة، المبيعات، …)
+        "rose": "ارتفع مؤشر {measure} من {first} إلى {last} بنسبة {pct}%.",
+        "fell": "تراجع مؤشر {measure} من {first} إلى {last} بنسبة {pct}%.",
+        "steady": "استقر مؤشر {measure} عند مستوى {last} تقريباً.",
         "peak": "سُجلت الذروة في {label} بقيمة {value}.",
-        "leader": "تصدّر «{leader}» في {dim} بقيمة {value} ({pct}% من الإجمالي).",
+        "leader": "تصدّر «{leader}» في {dim} بقيمة {value} ({pct}% من الإجمالي{scope}).",
         "leaderNoPct": "تصدّر «{leader}» في {dim} بقيمة {value}.",
-        "spread": "تتوزع البيانات على {count} فئة في {dim}.",
+        "scopeNote": " المحسوب على {pct}% من الصفوف المصنّفة",
+        "spread": "تتوزع البيانات على {count} {plural} في {dim}.",
         "recConcentration": "راجع تركّز {pct}% من {measure} في «{leader}» وقيّم مخاطر الاعتماد عليه.",
         "recTrend": "ادرس أسباب تغير {measure} بنسبة {pct}% خلال الفترة.",
         "recDetail": "وسّع البيانات المتاحة لتحليل أعمق (تفاصيل زمنية أو تصنيفات إضافية).",
@@ -30,9 +32,10 @@ _T = {
         "fell": "{measure} fell from {first} to {last}, down {pct}%.",
         "steady": "{measure} held steady at about {last}.",
         "peak": "The peak was recorded on {label} at {value}.",
-        "leader": "'{leader}' leads {dim} with {value} ({pct}% of the total).",
+        "leader": "'{leader}' leads {dim} with {value} ({pct}% of the total{scope}).",
         "leaderNoPct": "'{leader}' leads {dim} with {value}.",
-        "spread": "The data spreads across {count} categories in {dim}.",
+        "scopeNote": ", measured on the {pct}% of rows that carry a value",
+        "spread": "The data spreads across {count} {plural} in {dim}.",
         "recConcentration": "Review the {pct}% concentration of {measure} in '{leader}' and assess dependency risk.",
         "recTrend": "Investigate what drove the {pct}% change in {measure} over the period.",
         "recDetail": "Broaden the data available for deeper analysis (finer dates or extra categories).",
@@ -40,6 +43,9 @@ _T = {
         "of": "the data",
     },
 }
+
+
+from .labels import categories_word, measure_phrase
 
 
 def _fmt(value) -> str:
@@ -69,7 +75,7 @@ def compose_narrative(business: dict, labels: dict, language: str,
 
         if measure and "total" in kpis:
             line = t["total"].format(
-                measure=measure, total=_fmt(kpis["total"]["value"]),
+                measure=measure_phrase(measure), total=_fmt(kpis["total"]["value"]),
                 average=_fmt(kpis["average"]["value"]),
                 highest=_fmt(kpis["highest"]["value"]))
             findings.append(prefix + line)
@@ -97,10 +103,13 @@ def compose_narrative(business: dict, labels: dict, language: str,
 
         for bd in b.get("breakdowns", [])[:2]:
             dim = lbl(bd["column"])
+            coverage = bd.get("coverage_pct", 100)
+            scope = ("" if coverage >= 95
+                     else t["scopeNote"].format(pct=_fmt(coverage)))
             if bd.get("leader_share_pct") is not None:
                 findings.append(prefix + t["leader"].format(
                     leader=bd["leader"], dim=dim, value=_fmt(bd["leader_value"]),
-                    pct=_fmt(bd["leader_share_pct"])))
+                    pct=_fmt(bd["leader_share_pct"]), scope=scope))
                 if bd["leader_share_pct"] >= 50 and measure:
                     recommendations.append(t["recConcentration"].format(
                         pct=_fmt(bd["leader_share_pct"]), measure=measure,
@@ -108,8 +117,11 @@ def compose_narrative(business: dict, labels: dict, language: str,
             else:
                 findings.append(prefix + t["leaderNoPct"].format(
                     leader=bd["leader"], dim=dim, value=_fmt(bd["leader_value"])))
-            findings.append(prefix + t["spread"].format(
-                count=bd["categories"], dim=dim))
+            # «تتوزع على فئتين» ليست نتيجة تُعرض على الإدارة
+            if bd["categories"] > 3:
+                findings.append(prefix + t["spread"].format(
+                    count=bd["categories"], dim=dim,
+                    plural=categories_word(bd["categories"], language)))
 
     summary = " ".join(
         [t["covers"].format(records=_fmt(total_records),

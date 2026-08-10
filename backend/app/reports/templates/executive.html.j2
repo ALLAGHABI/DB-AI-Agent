@@ -1,0 +1,108 @@
+{% extends "_base.html.j2" %}
+{% import "_macros.html.j2" as m %}
+
+{% block page_css %}
+@page { size: A4 portrait; margin: 11mm; }
+body { background: #fff; }
+.sheet { max-width: 880px; margin: 0 auto; padding: 0 0 26px; }
+.cover {
+  background: linear-gradient(135deg, var(--brand-deep), var(--brand));
+  color: #fff; border-radius: 0 0 18px 18px; padding: 22px 28px 24px;
+  position: relative; overflow: hidden;
+}
+.cover::after {
+  content: ''; position: absolute; inset: 0; opacity: .07; pointer-events: none;
+  background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 13px 13px;
+}
+.cover .badge {
+  display: inline-block; border: 1px solid rgb(255 255 255 / .4); border-radius: 999px;
+  padding: 2px 11px; font-size: 11px; font-weight: 600; letter-spacing: .04em;
+}
+.cover h1 { font-size: 27px; font-weight: 800; margin-top: 9px; letter-spacing: -.02em; line-height: 1.25; }
+.pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.pills span {
+  border: 1px solid rgb(255 255 255 / .28); background: rgb(255 255 255 / .1);
+  border-radius: 999px; padding: 2px 11px; font-size: 11.5px;
+}
+.body { padding: 0 28px; }
+.kpi-row { margin-top: -14px; position: relative; z-index: 2; }
+.kpi { box-shadow: 0 2px 10px rgb(15 23 42 / .07); }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.stack { display: grid; gap: 14px; }
+.summary-card { border-inline-start: 4px solid var(--brand); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips li {
+  background: var(--brand-tint); color: #065f46; border-radius: 9px;
+  padding: 8px 12px; font-size: 12.5px; font-weight: 500; flex: 1 1 240px;
+  border: none; border-inline-start: none;
+}
+@media print { .sheet { padding-bottom: 0; } .cwrap { height: 165px; } .cwrap.hero { height: 190px; } }
+@media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+{% endblock %}
+
+{% block content %}
+<div class="sheet">
+  <header class="cover">
+    <span class="badge">{{ variant_badge }}</span>
+    <h1>{{ title }}</h1>
+    <div class="pills">
+      {% if period %}<span class="num">{{ t.period }}: {{ period[0] }} → {{ period[1] }}</span>{% endif %}
+      <span><bdi>{{ source_name }}</bdi></span>
+      <span class="num">{{ t.rows }}: {{ "{:,}".format(profile.overview.rows) }}</span>
+      <span class="num">{{ created_at }}</span>
+    </div>
+  </header>
+
+  <div class="body">
+    {% if kpis %}
+    <section class="kpi-row">
+      {% for k in kpis[:4] %}{{ m.kpi_card(k) }}{% endfor %}
+    </section>
+    {% endif %}
+
+    <section class="section split">
+      <div class="stack">
+        {% if 'summary' in sections and insights.summary %}
+        <div class="card summary-card">
+          <div class="kicker">{{ t.summary }}</div>
+          <p class="prose">{{ insights.summary }}</p>
+        </div>
+        {% endif %}
+        {% if 'findings' in sections and insights.findings %}
+        <div>
+          <div class="kicker">{{ t.findings }}</div>
+          <ol class="findings" style="margin-top:8px">
+            {% for f in insights.findings[:4] %}<li>{{ f }}</li>{% endfor %}
+          </ol>
+        </div>
+        {% endif %}
+      </div>
+
+      {% set right_tile = tiles[0] if (not hero and not concentration and tiles) else none %}
+      <div class="stack">
+        {% if hero %}{{ m.chart_card(hero) }}{% endif %}
+        {% if concentration %}{{ m.conc_card(concentration, t) }}{% endif %}
+        {% if right_tile %}{{ m.chart_card(right_tile) }}{% endif %}
+      </div>
+    </section>
+
+    {% set rest = tiles[1:] if right_tile else tiles %}
+    {% if rest %}
+    <section class="section stack">
+      {% for c in rest %}{{ m.chart_card(c) }}{% endfor %}
+    </section>
+    {% endif %}
+
+    {% if 'recommendations' in sections and insights.recommendations %}
+    <section class="section">
+      <div class="kicker">{{ t.recommendations }}</div>
+      <ul class="recs chips" style="margin-top:8px">
+        {% for r in insights.recommendations[:3] %}<li>{{ r }}</li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {{ m.report_foot(t, created_at, model_label, source_name, quality_note, dropped_claims) }}
+  </div>
+</div>
+{% endblock %}

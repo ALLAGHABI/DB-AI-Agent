@@ -121,6 +121,8 @@ export const api = {
     provider: string; model: string;
     overrides?: Record<string, SemanticOverride>;
     labels?: Record<string, string>;
+    sections?: ReportSection[];
+    charts?: ChartSpec[];
   }) => post('/api/reports/generate', body).then(r => j<{ job_id: string; status: string }>(r)),
   reportJob: (jobId: string) =>
     request(`/api/reports/jobs/${jobId}`).then(r => j<ReportJob>(r)),
@@ -154,6 +156,14 @@ export const api = {
   connectionUse: (id: string) =>
     post(`/api/connections/${id}/connect`, {})
       .then(r => j<{ success: boolean; dialect: string; tables: string[] }>(r)),
+};
+
+export type ReportSection =
+  'summary' | 'findings' | 'charts' | 'recommendations' | 'appendix';
+export type ChartType = 'bar' | 'column' | 'line' | 'donut';
+/** رسم واحد كما اختاره المستخدم — الترتيب في المصفوفة هو ترتيبه في التقرير. */
+export type ChartSpec = {
+  table?: string; kind: 'trend' | 'breakdown'; column?: string; type?: ChartType;
 };
 
 export type Semantics = { measures: string[]; dates: string[]; dimensions: string[] };

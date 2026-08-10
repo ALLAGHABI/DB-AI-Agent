@@ -73,6 +73,17 @@ def test_facts_are_grounded_strings(sales):
     assert "by city" in joined and "peak at" in joined
 
 
+def test_facts_speak_the_report_language(sales):
+    """النموذج يردّد ما يُعطى — فحقائق إنجليزية تُسرّب «records» إلى تقرير عربي."""
+    facts = facts_from_business(analyze_business(sales), table="orders",
+                                labels={"city": "المدينة", "total_amount": "المبيعات"},
+                                language="ar")
+    joined = " ".join(facts)
+    assert "عدد السجلات" in joined and "إجمالي المبيعات" in joined
+    assert "حسب المدينة" in joined and "الذروة" in joined
+    assert "records" not in joined and "categories" not in joined
+
+
 def test_handles_data_without_dates_or_measures():
     df = pd.DataFrame({"name": ["أ", "ب", "أ"], "note": ["x", "y", "z"]})
     b = analyze_business(df)
@@ -101,3 +112,91 @@ def test_near_unique_columns_are_not_dimensions():
 def test_high_cardinality_is_capped():
     df = pd.DataFrame({"code": [f"c{i % 45}" for i in range(200)]})
     assert detect_semantics(df)["dimensions"] == []      # 45 فئة > الحد
+
+
+def test_arabic_identifier_columns_are_not_measures():
+    """«رقم المرجع» رقم لا يُجمع ولا يُرسم عبر الزمن — وجمعه فضيحة تحليلية."""
+    df = pd.DataFrame({
+        "رقم المرجع": [10000 + i for i in range(30)],
+        "كود الوحدة": [100 + i % 5 for i in range(30)],
+        "تكلفة التشغيل": [200.0 + i for i in range(30)],
+    })
+    sem = detect_semantics(df)
+    assert "رقم المرجع" not in sem["measures"]
+    assert "كود الوحدة" not in sem["measures"]
+    assert sem["measures"] == ["تكلفة التشغيل"]
+
+
+def test_incomplete_edge_period_does_not_fake_a_collapse():
+    """شهر أخير فيه صفّان يُقرأ «انخفاض 98%» — نُسقط الفترة الطرفية المبتورة."""
+    full = pd.DataFrame({
+        "order_date": list(pd.date_range("2025-01-01", periods=90, freq="D")),
+        "total_amount": [1000.0] * 90,
+    })
+    tail = pd.DataFrame({"order_date": [pd.Timestamp("2025-05-02")],
+                         "total_amount": [50.0]})
+    b = analyze_business(pd.concat([full, tail], ignore_index=True))
+    tr = b["trend"]
+    assert tr["trimmed_periods"] >= 1                # مايو (وأبريل الفارغ) خارج الحساب
+    assert 50.0 not in tr["values"]
+    assert tr["period"][1] == "2025-03-31"
+    assert abs(tr["change_pct"]) < 50               # لا انهيار وهمي
+
+
+def test_breakdown_declares_its_scope_and_others():
+    df = pd.DataFrame({
+        "city": [f"c{i}" for i in range(10)] * 4 + [None] * 60,
+        "total_amount": [10.0] * 100,
+    })
+    bd = analyze_business(df)["breakdowns"][0]
+    assert bd["coverage_pct"] == 40.0                # 40 صفاً من 100
+    assert bd["others"] is not None                  # 10 فئات > TOP_N
+    assert sum(bd["values_pct"]) < 100.0
+
+
+def test_free_text_and_contact_columns_are_never_dimensions():
+    """«التوزيع حسب البريد الإلكتروني» رسم بلا معنى — ويكشف أفراداً."""
+    df = pd.DataFrame({
+        "البريد الإلكتروني": ["a@x.com", "b@x.com"] * 15,
+        "عنوان الشحن": ["ش. الملك", "ش. العليا"] * 15,
+        "الوصف": ["طويل", "قصير"] * 15,
+        "المدينة": ["الرياض", "جدة"] * 15,
+    })
+    assert detect_semantics(df)["dimensions"] == ["المدينة"]
+
+
+def test_identical_dimensions_are_not_charted_twice():
+    df = pd.DataFrame({
+        "الحالة": ["مكتمل"] * 30 + ["ملغي"] * 10,
+        "الوضع": ["مكتمل"] * 30 + ["ملغي"] * 10,
+        "المبلغ": [5.0] * 40,
+    })
+    b = analyze_business(df, {"dimensions": ["الحالة", "الوضع"]})
+    assert len(b["breakdowns"]) == 1
+
+
+def test_boolean_flags_are_never_measures():
+    """«متوسط نشط 0.9» و«تطور نشط عبر الزمن» هراء يفضح التقرير."""
+    df = pd.DataFrame({
+        "is_active": [1, 0, 1, 1] * 10,
+        "registered_at": pd.date_range("2025-01-01", periods=40, freq="D"),
+        "total_amount": [50.0] * 40,
+    })
+    sem = detect_semantics(df)
+    assert "is_active" not in sem["measures"]
+    assert sem["measures"] == ["total_amount"]
+
+
+def test_rates_are_averaged_not_summed():
+    """جمع أسعار الوحدات يعطي رقماً بلا معنى — والنسبة منه أسوأ."""
+    df = pd.DataFrame({
+        "product": ["آيفون", "شاحن"] * 20,
+        "unit_price": [4000.0, 50.0] * 20,
+    })
+    b = analyze_business(df)
+    kpis = {k["key"] for k in b["kpis"]}
+    assert "total" not in kpis and "average" in kpis
+    bd = b["breakdowns"][0]
+    assert bd["kind"] == "avg"
+    assert bd["values"][0] == 4000.0                 # متوسط لا مجموع
+    assert bd["leader_share_pct"] is None            # لا نِسَب على المتوسطات

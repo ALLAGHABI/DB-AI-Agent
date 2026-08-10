@@ -137,3 +137,11 @@ async def test_invented_numbers_are_stripped_end_to_end():
     out = await generate_insights(fake, "m", FACTS, "ar")
     assert out["dropped_claims"] == 1
     assert all("9876543" not in f for f in out["findings"])
+
+
+def test_bracketed_table_names_and_markdown_are_cleaned():
+    """النموذج يردّد صياغة الحقائق — القوس المربّع وعلامات Markdown أثر آلة."""
+    out = parse_insights("## SUMMARY\nتم تسجيل 3200 سجلاً لـ [المصروفات].\n"
+                         "## FINDINGS\n- **بلغ** الإجمالي 5 في [الميزانيات]")
+    assert "[" not in out["summary"] and "المصروفات" in out["summary"]
+    assert out["findings"][0] == "بلغ الإجمالي 5 في الميزانيات"

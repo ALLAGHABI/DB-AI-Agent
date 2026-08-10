@@ -30,36 +30,66 @@ def _sheet_name(name: str, used: set) -> str:
     return candidate
 
 
-def to_xlsx(profile: dict, insights: dict, language: str) -> bytes:
+def _write_business(writer, name: str, business: dict, ar: bool, used: set) -> None:
+    """ورقة أرقام الأعمال لكل مصدر — اتجاه وتوزيعات جاهزة لإعادة الاستخدام."""
+    rows: list[tuple] = []
+    for k in business.get("kpis", []):
+        rows.append((k["key"], k.get("column") or "", k["value"], ""))
+    tr = business.get("trend")
+    if tr:
+        for label, value in zip(tr["labels"], tr["values"]):
+            rows.append(("trend", tr.get("measure") or "", value, label))
+    for bd in business.get("breakdowns", []):
+        for label, value, pct in zip(bd["labels"], bd["values"], bd["values_pct"]):
+            rows.append((bd["column"], bd.get("measure") or "", value,
+                         f"{label} ({pct}%)" if pct is not None else label))
+    if not rows:
+        return
+    cols = (["المؤشر", "العمود", "القيمة", "التصنيف"] if ar
+            else ["Metric", "Column", "Value", "Label"])
+    pd.DataFrame(rows, columns=cols).to_excel(
+        writer, sheet_name=_sheet_name(name, used), index=False)
+
+
+def _narrative_rows(insights: dict, sections, ar: bool) -> list[tuple]:
+    rows: list[tuple] = []
+    if "summary" in sections and insights.get("summary"):
+        rows.append(("الملخص" if ar else "Summary", insights["summary"]))
+    if "findings" in sections:
+        for i, f in enumerate(insights.get("findings", []), 1):
+            rows.append((f"{'نتيجة' if ar else 'Finding'} {i}", f))
+    if "recommendations" in sections:
+        for i, r in enumerate(insights.get("recommendations", []), 1):
+            rows.append((f"{'توصية' if ar else 'Recommendation'} {i}", r))
+    return rows
+
+
+def to_xlsx(profile: dict, insights: dict, language: str,
+            sections=("summary", "findings", "recommendations", "appendix")) -> bytes:
+    """ورقة أرقام + سرد. لا ورقة «عينة» — تسرّب بيانات الأفراد في ملف يُتداول."""
     ar = language == "ar"
     if profile.get("kind") == "multi":
-        return _to_xlsx_multi(profile, insights, ar)
+        return _to_xlsx_multi(profile, insights, ar, sections)
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        # ورقة الملخص
         summary_rows = [
             ("الصفوف" if ar else "Rows", profile["overview"]["rows"]),
             ("الأعمدة" if ar else "Columns", profile["overview"]["cols"]),
             ("قيم مفقودة %" if ar else "Missing %", profile["overview"]["missing_pct"]),
             ("صفوف مكررة" if ar else "Duplicates", profile["overview"]["duplicate_rows"]),
             ("", ""),
-            ("الملخص" if ar else "Summary", insights.get("summary", "")),
-        ]
-        for i, f in enumerate(insights.get("findings", []), 1):
-            summary_rows.append((f"{'نتيجة' if ar else 'Finding'} {i}", f))
-        for i, r in enumerate(insights.get("recommendations", []), 1):
-            summary_rows.append((f"{'توصية' if ar else 'Recommendation'} {i}", r))
+        ] + _narrative_rows(insights, sections, ar)
         pd.DataFrame(summary_rows, columns=["البند" if ar else "Item",
                                             "القيمة" if ar else "Value"]) \
             .to_excel(writer, sheet_name="ملخص" if ar else "Summary", index=False)
 
-        # ورقة الأعمدة
-        pd.DataFrame(profile["columns"]).drop(columns=["top_values"], errors="ignore") \
-            .to_excel(writer, sheet_name="الأعمدة" if ar else "Columns", index=False)
+        used = {"ملخص" if ar else "Summary"}
+        for name, b in (profile.get("business") or {}).items():
+            _write_business(writer, name, b, ar, used)
 
-        # ورقة العينة
-        pd.DataFrame(profile["sample"], columns=profile["sample_columns"]) \
-            .to_excel(writer, sheet_name="عينة" if ar else "Sample", index=False)
+        if "appendix" in sections:
+            pd.DataFrame(profile["columns"]).drop(columns=["top_values"], errors="ignore") \
+                .to_excel(writer, sheet_name="الأعمدة" if ar else "Columns", index=False)
 
         for ws in writer.book.worksheets:
             _style_header(ws)
@@ -68,7 +98,7 @@ def to_xlsx(profile: dict, insights: dict, language: str) -> bytes:
     return buf.getvalue()
 
 
-def _to_xlsx_multi(profile: dict, insights: dict, ar: bool) -> bytes:
+def _to_xlsx_multi(profile: dict, insights: dict, ar: bool, sections) -> bytes:
     buf = io.BytesIO()
     used: set = set()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -78,25 +108,20 @@ def _to_xlsx_multi(profile: dict, insights: dict, ar: bool) -> bytes:
             ("إجمالي الأعمدة" if ar else "Total columns", profile["overview"]["cols"]),
             ("العلاقات" if ar else "Relationships", profile["overview"]["relationships"]),
             ("", ""),
-            ("الملخص" if ar else "Summary", insights.get("summary", "")),
-        ]
-        for i, f in enumerate(insights.get("findings", []), 1):
-            rows.append((f"{'نتيجة' if ar else 'Finding'} {i}", f))
-        for i, r in enumerate(insights.get("recommendations", []), 1):
-            rows.append((f"{'توصية' if ar else 'Recommendation'} {i}", r))
+        ] + _narrative_rows(insights, sections, ar)
         pd.DataFrame(rows, columns=["البند" if ar else "Item", "القيمة" if ar else "Value"]) \
             .to_excel(writer, sheet_name=_sheet_name("ملخص" if ar else "Summary", used),
                       index=False)
 
-        if profile["relationships"]:
-            pd.DataFrame(profile["relationships"]).to_excel(
-                writer, sheet_name=_sheet_name("العلاقات" if ar else "Relationships", used),
-                index=False)
+        for name, b in (profile.get("business") or {}).items():
+            _write_business(writer, name, b, ar, used)
 
-        for ds in profile["datasets"]:
-            df = pd.DataFrame(ds["profile"]["columns"]).drop(
-                columns=["top_values"], errors="ignore")
-            df.to_excel(writer, sheet_name=_sheet_name(ds["name"], used), index=False)
+        if "appendix" in sections:
+            for ds in profile["datasets"]:
+                df = pd.DataFrame(ds["profile"]["columns"]).drop(
+                    columns=["top_values"], errors="ignore")
+                df.to_excel(writer, sheet_name=_sheet_name(f"{ds['name']}-cols", used),
+                            index=False)
 
         for ws in writer.book.worksheets:
             _style_header(ws)

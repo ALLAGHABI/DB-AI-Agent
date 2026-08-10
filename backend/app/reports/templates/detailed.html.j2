@@ -1,0 +1,178 @@
+{% extends "_base.html.j2" %}
+{% import "_macros.html.j2" as m %}
+
+{% block page_css %}
+@page { size: A4 portrait; margin: 12mm; }
+body { background: #fff; }
+.sheet { max-width: 940px; margin: 0 auto; padding: 26px 30px 30px; }
+.head { border-bottom: 3px solid var(--brand); padding-bottom: 14px; display: flex;
+  flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.head h1 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+.head .badge {
+  display: inline-block; background: var(--brand-tint); color: #065f46; border-radius: 999px;
+  padding: 2px 11px; font-size: 11px; font-weight: 700; margin-bottom: 6px;
+}
+.head .meta { font-size: 11.5px; color: var(--ink-2); text-align: end; }
+.split { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; align-items: start; }
+.stats { display: grid; gap: 0; }
+.stats div { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid var(--line); font-size: 13px; }
+.stats div:last-child { border-bottom: none; }
+.stats b { font-variant-numeric: tabular-nums; font-weight: 700; }
+.drill { margin-top: 16px; }
+.drill .split { grid-template-columns: 1fr 1fr; }
+.break { break-before: page; }
+@media print { .cwrap { height: 190px; } }
+@media (max-width: 760px) { .split, .drill .split { grid-template-columns: 1fr; } }
+{% endblock %}
+
+{% block content %}
+<div class="sheet">
+  <header class="head">
+    <div>
+      <span class="badge">{{ variant_badge }}</span>
+      <h1>{{ title }}</h1>
+    </div>
+    <div class="meta">
+      <bdi>{{ source_name }}</bdi><br>
+      {{ t.generated }}: <span class="num">{{ created_at }}</span>
+      {% if period %}<br>{{ t.period }}: <span class="num">{{ period[0] }} → {{ period[1] }}</span>{% endif %}
+    </div>
+  </header>
+
+  {% if kpis %}
+  <section class="section kpi-row">
+    {% for k in kpis %}{{ m.kpi_card(k) }}{% endfor %}
+  </section>
+  {% endif %}
+
+  {% set ns = namespace(n=0) %}
+
+  {% if 'summary' in sections and insights.summary or 'findings' in sections and insights.findings %}
+  {% set ns.n = ns.n + 1 %}
+  <section class="section">
+    <div class="kicker">{{ t.sectionKicker.format(n=ns.n) }}</div>
+    <h2>{{ t.summary }}</h2>
+    {% if 'summary' in sections and insights.summary %}
+    <div class="card summary-card" style="margin-top:10px;border-inline-start:4px solid var(--brand)">
+      <p class="prose">{{ insights.summary }}</p>
+    </div>
+    {% endif %}
+    {% if 'findings' in sections and insights.findings %}
+    <ol class="findings" style="margin-top:14px">
+      {% for f in insights.findings %}<li>{{ f }}</li>{% endfor %}
+    </ol>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if hero and trend %}
+  {% set ns.n = ns.n + 1 %}
+  <section class="section">
+    <div class="kicker">{{ t.sectionKicker.format(n=ns.n) }}</div>
+    <h2>{{ t.trendSection }}</h2>
+    <div class="split" style="margin-top:10px">
+      {{ m.chart_card(hero, hero=true) }}
+      <div class="card">
+        <div class="stats">
+          <div><span>{{ t.start }}</span><b class="num">{{ '{:,}'.format(trend.first) }}</b></div>
+          <div><span>{{ t.end }}</span><b class="num">{{ '{:,}'.format(trend.last) }}</b></div>
+          {% if trend.change_pct is not none %}
+          <div><span>{{ t.change }}</span><b>{{ m.delta_pill(trend.change_pct) }}</b></div>
+          {% endif %}
+          <div><span>{{ t.peak }}</span><b class="num">{{ trend.peak_label }}</b></div>
+          <div><span>&nbsp;</span><b class="num">{{ '{:,}'.format(trend.peak_value) }}</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if rank_tables %}
+  {% set ns.n = ns.n + 1 %}
+  <section class="section">
+    <div class="kicker">{{ t.sectionKicker.format(n=ns.n) }}</div>
+    <h2>{{ t.charts }}</h2>
+    {% for blk in rank_tables %}
+      {% set matched = tiles | selectattr('column', 'equalto', blk.column)
+                             | selectattr('table', 'equalto', blk.table) | list %}
+      <div class="drill">
+        <h3 style="margin-bottom:8px">{% if blk.band %}{{ blk.band }} · {% endif %}{{ blk.title }}</h3>
+        <div class="split">
+          {% if matched %}{{ m.chart_card(matched[0]) }}{% else %}<div></div>{% endif %}
+          <div class="card">{{ m.rank_table(blk, t) }}
+            {% if blk.partial %}<p class="chart-note">{{ t.scopeNote }}</p>{% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if comparisons | length > 1 %}
+  {% set ns.n = ns.n + 1 %}
+  <section class="section">
+    <div class="kicker">{{ t.sectionKicker.format(n=ns.n) }}</div>
+    <h2>{{ t.comparisons }}</h2>
+    <div class="card" style="margin-top:10px">
+      <table class="grid">
+        <thead><tr>
+          <th>{{ t.dimension }}</th><th>{{ t.leaderCol }}</th><th>{{ t.runnerUp }}</th>
+          <th class="n">{{ t.delta }}</th><th style="width:96px">{{ t.share }}</th>
+        </tr></thead>
+        <tbody>
+          {% for r in comparisons %}
+          <tr>
+            <td>{{ r.dimension }}</td><td>{{ r.leader }}</td><td>{{ r.runner_up }}</td>
+            <td class="n">{{ r.delta }}</td>
+            <td class="bar-cell">{% if r.share is not none %}<span class="num">{{ r.share }}%</span>
+              <i style="width: {{ r.share }}%"></i>{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if 'recommendations' in sections and insights.recommendations %}
+  {% set ns.n = ns.n + 1 %}
+  <section class="section">
+    <div class="kicker">{{ t.sectionKicker.format(n=ns.n) }}</div>
+    <h2>{{ t.recommendations }}</h2>
+    <ul class="recs" style="margin-top:10px">
+      {% for r in insights.recommendations %}<li>{{ r }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if dictionary %}
+  {% set ns.n = ns.n + 1 %}
+  <section class="section break">
+    <div class="kicker">{{ t.sectionKicker.format(n=ns.n) }}</div>
+    <h2>{{ t.appendix }}</h2>
+    <div class="card" style="margin-top:10px">
+      <table class="grid">
+        <thead><tr>
+          {% if profile.kind == 'multi' %}<th>{{ t.table }}</th>{% endif %}
+          <th>{{ t.column }}</th><th>{{ t.kind }}</th>
+          <th class="n">{{ t.nulls }}</th><th class="n">{{ t.unique }}</th><th>{{ t.range }}</th>
+        </tr></thead>
+        <tbody>
+          {% for c in dictionary %}
+          <tr>
+            {% if profile.kind == 'multi' %}<td>{{ c.table }}</td>{% endif %}
+            <td>{{ c.name }}</td><td>{{ c.kind }}</td>
+            <td class="n">{{ c.nulls_pct }}%</td><td class="n">{{ '{:,}'.format(c.unique) }}</td>
+            <td class="n">{{ c.range or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {{ m.report_foot(t, created_at, model_label, source_name, quality_note, dropped_claims) }}
+</div>
+{% endblock %}

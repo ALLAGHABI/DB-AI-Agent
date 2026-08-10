@@ -1,5 +1,6 @@
 """استيراد وتصدير البيانات والنسخ الاحتياطي."""
 import io
+import re
 import sqlite3
 import tempfile
 
@@ -12,6 +13,9 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
 MAX_HEADER_SCAN = 6
+
+# «ال» وحدها ليست كلمة عربية — فهي أداة تعريف انفصلت عن كلمتها بكسر سطر
+_DANGLING_AL = re.compile(r"(?<![\w؀-ۿ])ال\s+(?=[؀-ۿ])")
 
 
 def _pick_header_row(preview: pd.DataFrame) -> int:
@@ -30,9 +34,19 @@ def _pick_header_row(preview: pd.DataFrame) -> int:
     return best
 
 
+def _clean_header(name) -> str:
+    """اسم عمود صالح للعرض — خلايا Excel تحمل أسطراً ومسافات مضاعفة.
+
+    «القيمة في ال\nشهر» تصير «القيمة في الشهر»، و«وحدة  القياس» تصير
+    «وحدة القياس» — وإلا ظهر الاسم مبتوراً أو مشوّهاً في كل عنوان بالتقرير.
+    """
+    text = re.sub(r"\s+", " ", str(name)).strip()
+    return _DANGLING_AL.sub("ال", text)      # «في ال ساعة» ⇒ «في الساعة»
+
+
 def _clean_frame(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(axis=1, how="all").dropna(axis=0, how="all")
-    df.columns = [str(c).strip() for c in df.columns]
+    df.columns = [_clean_header(c) for c in df.columns]
     keep = [c for c in df.columns if not c.lower().startswith("unnamed")]
     return df[keep] if keep else df
 

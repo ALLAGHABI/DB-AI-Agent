@@ -49,12 +49,14 @@ def test_html_english_ltr(profile, insights):
 
 def test_executive_variant_caps_charts(profile, insights):
     html = _build(profile, insights, variant="executive")
-    assert html.count('<canvas id="chart-') <= 3
+    assert html.count('<canvas id="ch-') <= 3
 
 
-def test_dashboard_variant_hides_findings(profile, insights):
+def test_dashboard_omits_recommendations_by_default(profile, insights):
+    """لوحة المؤشرات سطح مراقبة لا مذكرة — التوصيات ليست جزءاً منها افتراضياً."""
     html = _build(profile, insights, variant="dashboard")
-    assert "الرياض الأعلى مبيعاً" not in html
+    assert "ركز على الرياض" not in html
+    assert "الرياض الأعلى مبيعاً" in html          # النتائج تظهر في الشريط الجانبي
 
 
 def test_invalid_variant_rejected(profile, insights):
@@ -70,7 +72,7 @@ def test_xlsx_has_sheets_and_magic(profile, insights):
 
     import openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(data))
-    assert set(wb.sheetnames) == {"ملخص", "الأعمدة", "عينة"}
+    assert set(wb.sheetnames) == {"ملخص", "الأعمدة"}      # لا ورقة «عينة» بعد اليوم
 
 
 def test_store_roundtrip(tmp_path, profile, insights):
@@ -117,20 +119,67 @@ def business_profile():
 
 def test_executive_shows_business_kpis(business_profile, insights):
     html = _build(business_profile, insights, variant="executive")
-    assert "الإجمالي" in html and "المتوسط" in html      # مؤشرات أعمال
+    assert "إجمالي" in html and "متوسط" in html          # مؤشرات أعمال
     assert "25,000" in html                              # 40×500 + 20×250
-    assert "حسب city" in html or "city" in html          # رسم توزيع
+    assert "city" in html                                # رسم توزيع
 
 
 def test_executive_hides_technical_internals(business_profile, insights):
     html = _build(business_profile, insights, variant="executive")
-    for technical in ("قيم مفقودة", "صفوف مكررة", "تفاصيل الأعمدة", "عينة من البيانات"):
+    for technical in ("قيم مفقودة", "صفوف مكررة", "تفاصيل الأعمدة", "عينة من البيانات",
+                      "قاموس البيانات"):
         assert technical not in html, technical
 
 
-def test_detailed_keeps_technical_appendix(business_profile, insights):
+def test_data_sample_and_column_cards_are_gone_everywhere(business_profile, insights):
+    """قسمان كانا يفضحان التقرير: بطاقات الأعمدة وعينة صفوف خام (وفيها بيانات أفراد)."""
+    for variant in ("executive", "dashboard", "detailed"):
+        html = _build(business_profile, insights, variant=variant)
+        assert "عينة من البيانات" not in html
+        assert "تفاصيل الأعمدة" not in html
+        assert "col-card" not in html
+
+
+def test_detailed_replaces_them_with_dictionary_and_ranks(business_profile, insights):
     html = _build(business_profile, insights, variant="detailed")
-    assert "قيم مفقودة" in html and "تفاصيل الأعمدة" in html
+    assert "قاموس البيانات" in html                      # ملحق مضغوط بدل البطاقات
+    assert "تعمّق حسب" in html                            # جداول ترتيب بدل العينة
+    assert "جودة البيانات" in html                        # سطر واحد لا قسم
+
+
+def test_three_templates_are_visibly_different(business_profile, insights):
+    exec_html = _build(business_profile, insights, variant="executive")
+    dash = _build(business_profile, insights, variant="dashboard")
+    detail = _build(business_profile, insights, variant="detailed")
+    assert "موجز تنفيذي" in exec_html and "cover" in exec_html
+    assert "لوحة مؤشرات" in dash and "grid12" in dash and "landscape" in dash
+    assert "تقرير تحليلي مفصّل" in detail and "القسم 1" in detail
+    assert len({exec_html, dash, detail}) == 3
+
+
+def test_hidden_section_is_not_rendered(business_profile, insights):
+    html = _build(business_profile, insights, variant="detailed",
+                  sections=["charts"])
+    assert "ملخص تجريبي" not in html
+    assert "الرياض الأعلى مبيعاً" not in html
+    assert "ركز على الرياض" not in html
+    assert '<canvas id="ch-' in html                     # الرسوم وحدها بقيت
+
+
+def test_every_requested_chart_is_rendered(business_profile, insights):
+    """المستخدم اختار ثلاثة رسوم — القالب لا يبتلع واحداً منها بصمت."""
+    from app.reports.builder import chart_plan
+    plan = chart_plan(business_profile["business"], "executive", "ar")
+    html = _build(business_profile, insights, variant="executive", charts=plan)
+    for c in plan:
+        assert f'id="{c["id"]}"' in html, c["heading"]
+
+
+def test_charts_section_off_removes_every_canvas(business_profile, insights):
+    html = _build(business_profile, insights, variant="dashboard",
+                  sections=["summary", "findings"])
+    assert "<canvas" not in html
+    assert "ملخص تجريبي" in html
 
 
 def test_dropped_claims_are_disclosed(business_profile, insights):

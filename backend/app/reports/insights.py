@@ -30,23 +30,32 @@ Rules you must obey:
 - {instruction}
 
 Respond in EXACTLY this structure, keeping the English markers:
+{blocks}"""
 
+_BLOCKS = {
+    "summary": """
 ## SUMMARY
 One short paragraph (3-5 sentences) in {language_name} stating what the data covers
-and its most important business signal.
-
+and its most important business signal.""",
+    "findings": """
 ## FINDINGS
-- 3 to 6 bullets in {language_name}, each citing a number from the facts.
-
+- 3 to 6 bullets in {language_name}, each citing a number from the facts.""",
+    "recommendations": """
 ## RECOMMENDATIONS
-- 2 to 4 actionable bullets in {language_name} for a manager."""
+- 2 to 4 actionable bullets in {language_name} for a manager.""",
+}
+
+TEXT_SECTIONS = tuple(_BLOCKS)
 
 
-def build_insights_prompt(facts: list[str], language: str,
-                          subject: str = "") -> tuple[str, str]:
+def build_insights_prompt(facts: list[str], language: str, subject: str = "",
+                          sections: list[str] | None = None) -> tuple[str, str]:
+    """موجه لا يطلب إلا الأقسام المفعّلة — القسم المخفي لا يُولَّد أصلاً."""
     lang = _LANG.get(language, _LANG["en"])
+    wanted = [s for s in TEXT_SECTIONS if sections is None or s in sections]
+    blocks = "\n".join(_BLOCKS[s].format(language_name=lang["name"]) for s in wanted)
     system = SYSTEM_TEMPLATE.format(instruction=lang["instruction"],
-                                    language_name=lang["name"])
+                                    language_name=lang["name"], blocks=blocks)
     numbered = "\n".join(f"{i}. {f}" for i, f in enumerate(facts, 1))
     user = (f"Subject: {subject}\n\n" if subject else "") + \
         f"VERIFIED FACTS (the only numbers you may use):\n{numbered}\n\n" \
@@ -68,12 +77,20 @@ def _bullets(block: str) -> list[str]:
     return [b for b in out if b]
 
 
+_BRACKETED = re.compile(r"\[([^\[\]]{1,60})\]")
+
+
+def _humanize(text: str) -> str:
+    """يمسح آثار صياغة الحقائق: «لـ [المصروفات]» تصير «لـ المصروفات»."""
+    return _BRACKETED.sub(r"\1", text).replace("**", "").strip()
+
+
 def parse_insights(text: str) -> dict:
-    summary = _section(text, "SUMMARY")
-    findings = _bullets(_section(text, "FINDINGS"))
-    recommendations = _bullets(_section(text, "RECOMMENDATIONS"))
+    summary = _humanize(_section(text, "SUMMARY"))
+    findings = [_humanize(f) for f in _bullets(_section(text, "FINDINGS"))]
+    recommendations = [_humanize(r) for r in _bullets(_section(text, "RECOMMENDATIONS"))]
     if not summary and not findings:
-        summary = text.strip()
+        summary = _humanize(text)
     return {"summary": summary, "findings": findings,
             "recommendations": recommendations}
 
@@ -162,13 +179,19 @@ def strip_ungrounded(insights: dict, facts: list[str]) -> tuple[dict, list[str]]
 
 
 async def generate_insights(provider, model: str, facts: list[str], language: str,
-                            subject: str = "", fallback: dict | None = None) -> dict:
+                            subject: str = "", fallback: dict | None = None,
+                            sections: list[str] | None = None) -> dict:
     """يولّد الرؤى ويفرض اللغة ويزيل أي رقم غير مدعوم بالحقائق.
 
     `fallback` سرد محسوب من الأرقام؛ يحلّ محل رد النموذج إن خالف اللغة مرتين،
     ويكمل النقص إن أغفل النتائج أو التوصيات — فلا يخرج تقرير ناقص أو بلغة خاطئة.
+    `sections` تحصر ما يُطلب من النموذج؛ ما لم يُطلب لا يُولَّد ولا يُملأ احتياطياً.
     """
-    system, user = build_insights_prompt(facts, language, subject)
+    wanted = [s for s in TEXT_SECTIONS if sections is None or s in sections]
+    if not wanted:
+        return {"summary": "", "findings": [], "recommendations": [],
+                "language_ok": True, "dropped_claims": 0, "used_fallback": False}
+    system, user = build_insights_prompt(facts, language, subject, sections)
     result = await provider.chat(model, system, user, temperature=0.2, max_tokens=1200)
     insights = parse_insights(result.text)
 
@@ -187,13 +210,19 @@ async def generate_insights(provider, model: str, facts: list[str], language: st
 
     if fallback:
         if not language_matches(insights, language):
-            insights = dict(fallback)               # النموذج عجز عن اللغة
+            insights = {k: (fallback.get(k) if k in wanted else ("" if k == "summary"
+                                                                 else []))
+                        for k in TEXT_SECTIONS}     # النموذج عجز عن اللغة
             used_fallback = True
         else:                                        # نكمل ما أغفله فقط
-            for key in ("summary", "findings", "recommendations"):
+            for key in wanted:
                 if not insights.get(key) and fallback.get(key):
                     insights[key] = fallback[key]
                     used_fallback = True
+
+    for key in TEXT_SECTIONS:                        # المخفي لا يظهر مهما حدث
+        if key not in wanted:
+            insights[key] = "" if key == "summary" else []
 
     insights["language_ok"] = language_matches(insights, language)
     insights["dropped_claims"] = len(dropped)

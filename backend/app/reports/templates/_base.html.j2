@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="{{ language }}" dir="{{ 'rtl' if rtl else 'ltr' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+:root {
+  --brand: {{ brand_color }};
+  --brand-deep: #064e3b;
+  --brand-tint: #d1fae5;
+  --canvas: #eef1f4;
+  --card: #ffffff;
+  --line: #e2e8f0;
+  --ink: #0f172a;
+  --ink-2: #475569;
+  --ink-3: #94a3b8;
+  --pos: #059669;
+  --neg: #dc2626;
+  --warn: #d97706;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  color: var(--ink);
+  font-family: {{ "'IBM Plex Sans Arabic', 'Segoe UI', Tahoma" if rtl else "'Inter', 'Segoe UI'" }}, system-ui, sans-serif;
+  line-height: 1.6; font-size: 15px; background: var(--canvas);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* ——— بطاقات المؤشرات ——— */
+.kpi-row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.kpi {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 13px 15px; position: relative; overflow: hidden;
+}
+.kpi .k-label {
+  font-size: 11.5px; color: var(--ink-3); letter-spacing: .02em; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;                     /* سطران خير من تسمية مبتورة بنقاط */
+}
+.kpi .k-value { font-size: 25px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.kpi .k-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.delta {
+  display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700;
+  border-radius: 999px; padding: 1px 8px; white-space: nowrap;
+}
+.delta.up { background: var(--brand-tint); color: #047857; }
+.delta.down { background: #fee2e2; color: var(--neg); }
+.delta.flat { background: #f1f5f9; color: var(--ink-2); }
+.spark { display: block; }
+
+/* ——— عناوين الأقسام ——— */
+.kicker {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--brand); margin-bottom: 2px;
+}
+h2 { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+h3 { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.section { margin-top: 26px; }
+
+/* ——— البطاقات والرسوم ——— */
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 16px; box-shadow: 0 1px 2px rgb(15 23 42 / .05);
+}
+.chart-card h3 { margin-bottom: 10px; }
+.cwrap { position: relative; height: 220px; }
+.cwrap.hero { height: 290px; }
+.chart-note { font-size: 11.5px; color: var(--ink-3); margin-top: 8px; }
+
+/* ——— بطاقة التركّز ——— */
+.conc { text-align: center; }
+.conc .gwrap { position: relative; height: 120px; }
+.conc .gval {
+  position: absolute; inset-inline: 0; bottom: 6px; font-size: 30px; font-weight: 800;
+  font-variant-numeric: tabular-nums; color: var(--brand);
+}
+.conc p { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+
+/* ——— النصوص ——— */
+.prose { font-size: 14.5px; color: var(--ink); }
+ol.findings { list-style: none; display: grid; gap: 10px; counter-reset: f; }
+ol.findings li { counter-increment: f; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+ol.findings li::before {
+  content: counter(f); flex: none; width: 21px; height: 21px; border-radius: 6px;
+  background: var(--brand-tint); color: #047857; font-size: 11.5px; font-weight: 700;
+  display: grid; place-items: center; margin-top: 2px;
+}
+ul.recs { list-style: none; display: grid; gap: 8px; }
+ul.recs li {
+  font-size: 13.5px; background: var(--card); border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--brand); border-radius: 9px; padding: 9px 13px;
+}
+
+/* ——— الجداول ——— */
+table.grid { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.grid th, table.grid td { padding: 7px 10px; text-align: start; border-bottom: 1px solid var(--line); }
+table.grid th { font-size: 11px; font-weight: 700; color: var(--ink-3); letter-spacing: .04em; text-transform: uppercase; }
+table.grid td.n { font-variant-numeric: tabular-nums; }
+table.grid tbody tr:nth-child(even) { background: #f8fafc; }
+table.grid tr.rest td { color: var(--ink-3); font-style: italic; }
+.bar-cell { position: relative; min-width: 70px; }
+.bar-cell i {
+  display: block; height: 5px; border-radius: 3px; background: var(--brand); opacity: .75;
+}
+
+footer.report-foot {
+  margin-top: 34px; padding-top: 12px; border-top: 1px solid var(--line);
+  color: var(--ink-3); font-size: 10.5px; display: flex; flex-wrap: wrap;
+  justify-content: space-between; gap: 6px;
+}
+
+@media print {
+  body { background: #fff; font-size: 12px; }
+  .card, .kpi, .rank-block, .drill, ul.recs li, table.grid { break-inside: avoid; }
+  h2, .kicker { break-after: avoid; }
+  .no-print { display: none !important; }
+}
+{% block page_css %}{% endblock %}
+</style>
+</head>
+<body class="{{ variant }}">
+{% block content %}{% endblock %}
+
+<script>{{ chartjs_source }}</script>
+<script>
+const CHARTS = {{ charts_json }};
+const PALETTE = {{ palette_json }};
+const LANG = {{ language | tojson }};
+const RTL = {{ 'true' if rtl else 'false' }};
+const BRAND = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim();
+const INK2 = '#475569', INK3 = '#94a3b8', GRID = '#eef1f4';
+Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+Chart.defaults.color = INK2;
+Chart.defaults.devicePixelRatio = 2;
+Chart.defaults.animation = false;
+
+const MONTH = new Intl.DateTimeFormat(LANG, { month: 'short', year: 'numeric' });
+const DAY = new Intl.DateTimeFormat(LANG, { month: 'short', day: 'numeric' });
+function axisLabels(c) {
+  if (!c.granularity) return c.labels;
+  const fmt = c.granularity === 'month' ? MONTH : DAY;
+  return c.labels.map((l) => {
+    const d = new Date(l);
+    return isNaN(d) ? l : fmt.format(d);
+  });
+}
+function gradient(ctx, color) {
+  const g = ctx.createLinearGradient(0, 0, 0, 260);
+  g.addColorStop(0, color + '33');
+  g.addColorStop(1, color + '00');
+  return g;
+}
+const AXES = {
+  x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12, font: { size: 11 } }, border: { color: '#e2e8f0' } },
+  y: { grid: { color: GRID }, border: { display: false }, beginAtZero: true, ticks: { font: { size: 11 }, color: INK3 } },
+};
+const BASE = { responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { rtl: RTL } } };
+
+CHARTS.forEach((c) => {
+  const el = document.getElementById(c.id);
+  if (!el) return;
+  const labels = axisLabels(c);
+  if (c.type === 'line_area') {
+    const pointRadius = c.labels.map((_, i) => (i === c.peak_index ? 5 : (c.labels.length <= 8 ? 3 : 0)));
+    const pointColor = c.labels.map((_, i) => (i === c.peak_index ? '#d97706' : BRAND));
+    new Chart(el, { type: 'line', data: { labels, datasets: [{
+      data: c.values, borderColor: BRAND, borderWidth: 2.2, tension: 0.32,
+      fill: true, backgroundColor: gradient(el.getContext('2d'), BRAND),
+      pointRadius, pointBackgroundColor: pointColor, pointBorderColor: '#fff',
+      pointBorderWidth: 1.5, pointHoverRadius: 6,
+    }] }, options: { ...BASE, scales: AXES } });
+  } else if (c.type === 'doughnut') {
+    new Chart(el, { type: 'doughnut', data: { labels, datasets: [{
+      data: c.values, backgroundColor: c.colors || PALETTE, borderWidth: 2, borderColor: '#fff',
+    }] }, options: { ...BASE, cutout: '62%',
+      plugins: { ...BASE.plugins, legend: { display: true, position: RTL ? 'left' : 'right',
+        rtl: RTL, labels: { boxWidth: 10, boxHeight: 10, font: { size: 11.5 }, usePointStyle: true, pointStyle: 'circle' } } } } });
+  } else if (c.type === 'gauge') {
+    new Chart(el, { type: 'doughnut', data: { labels: [], datasets: [{
+      data: c.values, backgroundColor: [BRAND, '#e2e8f0'], borderWidth: 0,
+    }] }, options: { ...BASE, circumference: 180, rotation: -90, cutout: '74%' } });
+  } else {
+    const horizontal = c.type === 'hbar';
+    const colors = c.values.map((_, i) => (i === 0 && c.kind === 'breakdown' ? BRAND : '#94a3b8'));
+    new Chart(el, { type: 'bar', data: { labels, datasets: [{
+      data: c.values, backgroundColor: c.kind === 'histogram' ? '#64748b' : colors,
+      borderRadius: 5, maxBarThickness: horizontal ? 22 : 46,
+      categoryPercentage: c.kind === 'histogram' ? 1.0 : 0.82,
+      barPercentage: c.kind === 'histogram' ? 0.98 : 0.86,
+    }] }, options: { ...BASE, indexAxis: horizontal ? 'y' : 'x',
+      scales: horizontal
+        ? { x: { ...AXES.y }, y: { ...AXES.x, ticks: { ...AXES.x.ticks, maxRotation: 0, autoSkip: false } } }
+        : AXES } });
+  }
+});
+</script>
+</body>
+</html>

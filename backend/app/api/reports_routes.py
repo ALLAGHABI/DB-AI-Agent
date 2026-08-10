@@ -1,6 +1,7 @@
 """مسارات استوديو التقارير."""
 import asyncio
 import datetime
+import re
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -10,6 +11,7 @@ from ..db import transfer
 from ..reports import exporter
 from ..reports.analyzer import MAX_DATASETS, profile_datasets, profile_df
 from ..reports.business import analyze_business, facts_from_business
+from ..reports import builder
 from ..reports.builder import build_report_html
 from ..reports.labels import label_columns
 from ..reports.narrative import compose_narrative
@@ -112,6 +114,13 @@ async def analyze(file: UploadFile = File(...), language: str = Form("ar")):
             "semantics": semantics, "labels": labels, "sheets": list(sheets)}
 
 
+class ChartSpec(BaseModel):
+    table: str | None = None             # None = المصدر الوحيد
+    kind: str = "breakdown"              # trend | breakdown
+    column: str | None = None            # عمود البُعد (للتوزيعات)
+    type: str | None = None              # bar | column | line | area | donut
+
+
 class GenerateIn(BaseModel):
     token: str
     title: str
@@ -121,6 +130,18 @@ class GenerateIn(BaseModel):
     model: str
     overrides: dict | None = None        # {table: {measure, date, dimensions}}
     labels: dict | None = None           # {column: "تسمية وصفية"}
+    sections: list[str] | None = None    # المفعّل فقط؛ None = افتراضي القالب
+    charts: list[ChartSpec] | None = None  # ترتيب ونوع كل رسم؛ None = تلقائي
+
+
+_EXT = re.compile(r"\.(csv|xlsx?|json)(-\d+)?$", re.IGNORECASE)
+_COPY = re.compile(r"\s*\(\d+\)$")             # نسخة مكررة من التنزيل
+
+
+def _clean_title(raw: str, fallback: str) -> str:
+    """عنوان التقرير لا يحمل امتداد الملف — «تقرير.XLSX-2» ليس عنواناً لصفحة أولى."""
+    text = _COPY.sub("", _EXT.sub("", str(raw or "").strip())).strip(" -_·")
+    return text or fallback
 
 
 @router.post("/generate")
@@ -136,6 +157,10 @@ def generate(body: GenerateIn):
         provider = state.provider_by_id(body.provider)
     except KeyError:
         raise http_error("unknownProvider", provider=body.provider)
+
+    title = _clean_title(body.title, saved["source_name"])
+    sections = (None if body.sections is None
+                else [s for s in body.sections if s in builder.SECTIONS])
 
     def work() -> dict:
         frames, source_name = saved["frames"], saved["source_name"]
@@ -156,7 +181,7 @@ def generate(body: GenerateIn):
             label = name if len(frames) > 1 else None
             b = analyze_business(df, body.overrides.get(name) if body.overrides else None)
             business[name] = b
-            facts.extend(facts_from_business(b, label, labels))
+            facts.extend(facts_from_business(b, label, labels, body.language))
         profile = {**profile, "business": business}
 
         fallback = compose_narrative(business, labels, body.language,
@@ -164,21 +189,30 @@ def generate(body: GenerateIn):
         try:
             insights = asyncio.run(generate_insights(
                 provider, body.model, facts, body.language,
-                subject=source_name, fallback=fallback))
+                subject=source_name, fallback=fallback, sections=sections))
         except AppError:
             raise
         except Exception as e:
             raise AppError("insightsFailed", 502, detail=str(e))
 
+        charts = None
+        if body.charts is not None:
+            charts = builder.chart_plan(
+                business, body.template, body.language, labels,
+                requested=[c.model_dump() for c in body.charts])
+
         now = datetime.datetime.now().astimezone()
         created_at = now.strftime("%Y-%m-%d %H:%M")
         model_label = f"{provider.id}/{body.model}"
         html = build_report_html(
-            title=body.title, profile=profile, insights=insights,
+            title=title, profile=profile, insights=insights,
             language=body.language, variant=body.template,
             source_name=source_name, model_label=model_label,
-            created_at=created_at, labels=labels)
-        xlsx = exporter.to_xlsx(profile, insights, body.language)
+            created_at=created_at, labels=labels,
+            sections=sections, charts=charts)
+        xlsx = exporter.to_xlsx(profile, insights, body.language,
+                                sections=sections or builder.DEFAULT_SECTIONS[
+                                    body.template])
         try:
             pdf = exporter.to_pdf(html)
         except Exception as e:
@@ -186,7 +220,7 @@ def generate(body: GenerateIn):
             pdf = None
 
         meta = {
-            "title": body.title, "template": body.template, "language": body.language,
+            "title": title, "template": body.template, "language": body.language,
             "language_ok": insights.get("language_ok", True),
             "dropped_claims": insights.get("dropped_claims", 0),
             "used_fallback": insights.get("used_fallback", False),

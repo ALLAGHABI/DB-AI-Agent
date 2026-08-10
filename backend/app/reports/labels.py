@@ -24,6 +24,18 @@ _DICTIONARY: dict[str, tuple[str, str]] = {
     "status": ("الحالة", "Status"),
     "type": ("النوع", "Type"),
     "category": ("الفئة", "Category"),
+    "categories": ("الفئات", "Categories"),
+    "item": ("البند", "Item"),
+    "items": ("البنود", "Items"),
+    "transaction": ("العملية", "Transaction"),
+    "transactions": ("العمليات", "Transactions"),
+    "supplier": ("المورّد", "Supplier"),
+    "suppliers": ("الموردون", "Suppliers"),
+    "employees": ("الموظفون", "Employees"),
+    "invoices": ("الفواتير", "Invoices"),
+    "payments": ("المدفوعات", "Payments"),
+    "branches": ("الفروع", "Branches"),
+    "departments": ("الأقسام", "Departments"),
     "customer": ("العميل", "Customer"),
     "customers": ("العملاء", "Customers"),
     "client": ("العميل", "Client"),
@@ -83,6 +95,8 @@ _PHRASES: dict[tuple[str, ...], tuple[str, str]] = {
     ("is", "active"): ("نشط", "Active"),
     ("first", "name"): ("الاسم الأول", "First name"),
     ("last", "name"): ("اسم العائلة", "Last name"),
+    ("order", "items"): ("بنود الطلبات", "Order items"),
+    ("order", "item"): ("بند الطلب", "Order item"),
 }
 
 _ARABIC = re.compile(r"[؀-ۿ]")
@@ -129,6 +143,26 @@ def humanize(name: str, language: str = "en") -> str:
     # لا نعرفها — نجمّل الاسم الأصلي
     pretty = " ".join(words)
     return pretty[:1].upper() + pretty[1:]
+
+
+_AGG_PREFIX = re.compile(
+    r"^(اجمالي|إجمالي|مجموع|صافي|total|sum|net)\s+", re.IGNORECASE)
+
+
+def measure_phrase(label: str) -> str:
+    """تسمية صالحة للتركيب بعد «إجمالي/متوسط».
+
+    «اجمالي تكلفة التشغيل» تصير «تكلفة التشغيل» فلا يُقرأ التقرير
+    «بلغ إجمالي اجمالي تكلفة…».
+    """
+    return _AGG_PREFIX.sub("", str(label).strip()) or str(label)
+
+
+def categories_word(count: int, language: str = "en") -> str:
+    """العربية تجمع 3–10 جمع تكسير وما فوقها مفرداً: 5 فئات، 12 فئة."""
+    if language != "ar":
+        return "category" if count == 1 else "categories"
+    return "فئات" if 3 <= count <= 10 else "فئة"
 
 
 def label_columns(names: list[str], language: str = "en",

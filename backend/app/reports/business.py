@@ -6,6 +6,8 @@
 كل رقم هنا محسوب من البيانات فعلياً — ويُمرَّر للنموذج كقائمة حقائق
 ليكتب فوقها بدل أن يخترع.
 """
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -14,22 +16,65 @@ _MEASURE_HINTS = ("amount", "total", "price", "revenue", "sales", "cost", "value
                   "salary", "profit", "balance", "قيمة", "مبلغ", "سعر", "إجمالي",
                   "ايراد", "إيراد", "مبيعات", "راتب", "تكلفة")
 _COUNT_HINTS = ("qty", "quantity", "count", "units", "stock", "عدد", "كمية", "مخزون")
+# أعمدة تجميعية جاهزة: «اجمالي تكلفة التشغيل» أصلح للجمع من «القيمة في الشهر»
+_AGGREGATE_HINTS = ("اجمالي", "إجمالي", "مجموع", "total", "sum", "net", "صافي")
+# معدّلات ونِسَب: جمعها بلا معنى — «القيمة في الشهر» ليست مبلغاً يُجمع
+_RATE_HINTS = ("في الساعة", "بالساعة", "لكل", "معدل", "نسبة", "متوسط", "سعر",
+               " per ", "per_", "_per", "rate", "ratio", "percent", "price",
+               "avg", "average")
+# أعلام منطقية (0/1) — «متوسط نشط 0.9» و«تطور نشط عبر الزمن» هراء تحليلي
+_FLAG_HINTS = ("is_", "has_", "active", "enabled", "deleted", "flag",
+               "نشط", "مفعل", "محذوف")
 _DIM_HINTS = ("city", "country", "region", "category", "type", "status", "state",
               "name", "product", "customer", "branch", "department", "gender",
               "مدينة", "دولة", "منطقة", "فئة", "نوع", "حالة", "اسم", "قسم", "فرع")
+# حقول نصية حرة أو بيانات تواصل — رسم توزيع عليها بلا فائدة وقد يكشف أفراداً
+_NON_DIM_HINTS = ("email", "mail", "phone", "mobile", "address", "description",
+                  "note", "comment", "url", "link", "password",
+                  "بريد", "هاتف", "جوال", "عنوان", "وصف", "ملاحظ", "رابط")
+
+# كلمات تدل على معرّف لا مقياس — «رقم المرجع» ليس رقماً يُجمع أو يُرسم
+_ID_TOKENS = frozenset((
+    "id", "code", "codes", "serial", "barcode", "sku", "no", "num", "number",
+    "رقم", "الرقم", "ارقام", "أرقام", "كود", "الكود", "رمز", "الرمز",
+    "معرف", "المعرف", "هوية", "الهوية", "تسلسل", "التسلسل", "بطاقة",
+))
 
 TOP_N = 8
 MAX_TREND_POINTS = 24
 MAX_DIM_CATEGORIES = 30
 MIN_ROWS_FOR_RATIO = 20
+NEAR_UNIQUE_RATIO = 0.95
+# فترة طرفية أقل من هذه النسبة من الوسيط = فترة غير مكتملة، لا انهيار حقيقي
+MIN_EDGE_SHARE = 0.35
+
+
+def _tokens(name: str) -> list[str]:
+    return [t for t in re.split(r"[\s_\-.]+", str(name).strip().lower()) if t]
+
+
+def is_rate(name: str) -> bool:
+    """عمود يمثل معدلاً/سعر وحدة — يُتوسَّط ولا يُجمع."""
+    return any(h in str(name).lower() for h in _RATE_HINTS)
+
+
+def _is_flag(name: str, series: pd.Series) -> bool:
+    low = str(name).lower()
+    values = set(pd.Series(series.dropna().unique()).tolist())
+    return bool(values and values <= {0, 1, 0.0, 1.0}
+                and (len(values) <= 2 or any(h in low for h in _FLAG_HINTS)))
 
 
 def _is_identifier(name: str, series: pd.Series) -> bool:
-    low = name.lower()
-    if low == "id" or low.endswith(("_id", "-id")) or low.startswith("id_"):
+    """معرّف = اسمه يدل عليه، أو قيمه أعداد صحيحة شبه فريدة."""
+    toks = _tokens(name)
+    if toks and (toks[0] in _ID_TOKENS or toks[-1] in _ID_TOKENS):
         return True
-    return bool(len(series) and series.nunique(dropna=True) == len(series)
-                and pd.api.types.is_integer_dtype(series))
+    # نسبة التفرد لا معنى لها على عينة صغيرة: جدول ميزانيات بأربعة صفوف
+    # كل قيمه مختلفة، وليست معرّفات.
+    if len(series) < MIN_ROWS_FOR_RATIO or not pd.api.types.is_integer_dtype(series):
+        return False
+    return series.nunique(dropna=True) / len(series) >= NEAR_UNIQUE_RATIO
 
 
 def detect_semantics(df: pd.DataFrame) -> dict:
@@ -44,14 +89,19 @@ def detect_semantics(df: pd.DataFrame) -> dict:
             continue
 
         if pd.api.types.is_numeric_dtype(s) and not pd.api.types.is_bool_dtype(s):
-            if _is_identifier(name, s):
+            if _is_identifier(name, s) or _is_flag(name, s):
                 continue
             score = 2 if any(h in low for h in _MEASURE_HINTS) else 0
             score += 1 if any(h in low for h in _COUNT_HINTS) else 0
+            score += 2 if any(h in low for h in _AGGREGATE_HINTS) else 0
+            score -= 3 if any(h in low for h in _RATE_HINTS) else 0
             measures.append((score, name))
             continue
 
-        # تصنيف مفيد = فئات قليلة متكررة؛ عمود شبه فريد (عنوان، ملاحظة) لا يصلح.
+        if any(h in low for h in _NON_DIM_HINTS):
+            continue
+
+        # تصنيف مفيد = فئات قليلة متكررة؛ عمود شبه فريد (اسم، رقم مرجعي) لا يصلح.
         # نسبة التفرد لا معنى لها على عينة صغيرة، فنطبقها من MIN_ROWS_FOR_RATIO فأكثر.
         unique = s.nunique(dropna=True)
         rows = len(s.dropna())
@@ -82,8 +132,9 @@ def _kpis(df: pd.DataFrame, measure: str | None) -> list[dict]:
     if measure and measure in df.columns:
         s = pd.to_numeric(df[measure], errors="coerce").dropna()
         if len(s):
+            if not is_rate(measure):           # لا يُجمع سعر الوحدة ولا المعدل
+                out.append({"key": "total", "value": _num(s.sum()), "column": measure})
             out += [
-                {"key": "total", "value": _num(s.sum()), "column": measure},
                 {"key": "average", "value": _num(s.mean()), "column": measure},
                 {"key": "highest", "value": _num(s.max()), "column": measure},
             ]
@@ -104,7 +155,22 @@ def _trend(df: pd.DataFrame, date_col: str, measure: str | None) -> dict | None:
     grouper = pd.Grouper(key=date_col, freq=freq)
     series = (d.groupby(grouper)[measure].sum() if measure and measure in d.columns
               else d.groupby(grouper).size())
+    counts = d.groupby(grouper).size()
+    bounds = d.groupby(grouper)[date_col].agg(["min", "max"])
     series = series.tail(MAX_TREND_POINTS)
+    counts, bounds = counts.tail(MAX_TREND_POINTS), bounds.tail(MAX_TREND_POINTS)
+
+    # فترة البداية أو النهاية قد تكون مبتورة (شهر لم يكتمل، أو صفوف بتواريخ شاذة)،
+    # فتُقرأ كقفزة أو انهيار وهميين — نُسقطها بدل بناء استنتاج عليها.
+    keep = list(range(len(series)))
+    if len(keep) > 2:
+        floor = float(np.median(counts.values)) * MIN_EDGE_SHARE
+        while len(keep) > 2 and counts.iloc[keep[0]] < floor:
+            keep.pop(0)
+        while len(keep) > 2 and counts.iloc[keep[-1]] < floor:
+            keep.pop()
+    trimmed = len(series) - len(keep)
+    series, bounds = series.iloc[keep], bounds.iloc[keep]
     if len(series) < 2:
         return None
 
@@ -112,6 +178,8 @@ def _trend(df: pd.DataFrame, date_col: str, measure: str | None) -> dict | None:
     first, last = values[0], values[-1]
     change = round(((last - first) / first) * 100, 1) if first else None
     peak_idx = int(np.argmax(values))
+    period = [str(pd.Timestamp(bounds["min"].min()).date()),
+              str(pd.Timestamp(bounds["max"].max()).date())]
     return {
         "column": date_col, "measure": measure, "granularity": label,
         "labels": [str(pd.Timestamp(i).date()) for i in series.index],
@@ -119,7 +187,8 @@ def _trend(df: pd.DataFrame, date_col: str, measure: str | None) -> dict | None:
         "first": first, "last": last, "change_pct": change,
         "peak_label": str(pd.Timestamp(series.index[peak_idx]).date()),
         "peak_value": values[peak_idx],
-        "period": [str(d[date_col].min().date()), str(d[date_col].max().date())],
+        "period": period,
+        "trimmed_periods": trimmed,
     }
 
 
@@ -128,25 +197,39 @@ def _breakdown(df: pd.DataFrame, dim: str, measure: str | None) -> dict | None:
     if d.empty:
         return None
     if measure and measure in d.columns:
-        grouped = (d.assign(_m=pd.to_numeric(d[measure], errors="coerce"))
-                   .groupby(dim)["_m"].sum().dropna().sort_values(ascending=False))
-        kind = "sum"
+        numeric = d.assign(_m=pd.to_numeric(d[measure], errors="coerce")).groupby(dim)["_m"]
+        rate = is_rate(measure)
+        grouped = (numeric.mean() if rate else numeric.sum()) \
+            .dropna().sort_values(ascending=False)
+        kind = "avg" if rate else "sum"
     else:
         grouped = d.groupby(dim).size().sort_values(ascending=False)
         kind = "count"
     if grouped.empty:
         return None
 
-    top = grouped.head(TOP_N)
+    # «أخرى (فئة واحدة)» عبث — إن بقيت واحدة فقط نعرضها باسمها
+    top = grouped.head(TOP_N + 1 if grouped.size == TOP_N + 1 else TOP_N)
     total = float(grouped.sum())
+    values = [_num(v) or 0 for v in top.values]
+    others = _num(total - sum(values)) if grouped.size > TOP_N else None
+    # نسبة الصفوف المصنّفة فعلاً — نسبةٌ محسوبة على 40% من البيانات يجب أن تُعلن
+    coverage = round(100 * len(d) / len(df), 1) if len(df) else 100.0
     return {
-        "column": dim, "measure": measure if kind == "sum" else None, "kind": kind,
+        "column": dim, "measure": measure if kind != "count" else None, "kind": kind,
         "labels": [str(i) for i in top.index],
-        "values": [_num(v) or 0 for v in top.values],
+        "values": values,
+        "values_pct": [round(100 * float(v) / total, 1) if total else None
+                       for v in values],
+        "total": _num(total),
+        "others": others if others and others > 0 else None,
         "leader": str(top.index[0]),
         "leader_value": _num(top.iloc[0]),
-        "leader_share_pct": round(100 * float(top.iloc[0]) / total, 1) if total else None,
+        # «حصة من مجموع المتوسطات» رقم بلا معنى — النِسَب للمجاميع والأعداد فقط
+        "leader_share_pct": (round(100 * float(top.iloc[0]) / total, 1)
+                             if total and kind != "avg" else None),
         "categories": int(grouped.size),
+        "coverage_pct": coverage,
     }
 
 
@@ -169,7 +252,19 @@ def analyze_business(df: pd.DataFrame, overrides: dict | None = None) -> dict:
     dims = overrides.get("dimensions") or semantics["dimensions"][:3]
 
     trend = _trend(df, date_col, measure) if date_col else None
-    breakdowns = [b for b in (_breakdown(df, d, measure) for d in dims) if b]
+
+    # بُعدان مختلفا الاسم قد يعطيان الأرقام نفسها (عمودان متطابقان في الملف)
+    # — رسمان متطابقان بعنوانين مختلفين يفضحان التقرير، فنُبقي الأول فقط.
+    breakdowns, seen = [], set()
+    for d in dims:
+        b = _breakdown(df, d, measure)
+        if not b:
+            continue
+        signature = (tuple(b["labels"]), tuple(b["values"]))
+        if signature in seen:
+            continue
+        seen.add(signature)
+        breakdowns.append(b)
 
     return {
         "semantics": {**semantics, "chosen": {
@@ -180,36 +275,72 @@ def analyze_business(df: pd.DataFrame, overrides: dict | None = None) -> dict:
     }
 
 
+# مفردات الحقائق بلغة التقرير — النموذج يردّد ما يُعطى، فيجب أن يُعطى بلغته
+_FACT_WORDS = {
+    "ar": {
+        "records": "عدد السجلات", "total": "إجمالي {m}", "average": "متوسط {m}",
+        "highest": "أعلى قيمة لـ{m}",
+        "period": "الفترة من {a} إلى {b}",
+        "change": "أول قيمة = {first}، آخر قيمة = {last}",
+        "changePct": "، نسبة التغير = {pct}%",
+        "peak": "الذروة في {label} = {value}",
+        "by": "حسب {dim}: {n} فئة، المتصدر «{leader}» = {value}",
+        "share": " ({pct}% من الإجمالي)",
+        "scope": " (محسوبة على {pct}% من الصفوف التي تحمل قيمة)",
+        "top": "أعلى قيم {dim}: {pairs}",
+    },
+    "en": {
+        "records": "records", "total": "total of {m}", "average": "average of {m}",
+        "highest": "highest of {m}",
+        "period": "period from {a} to {b}",
+        "change": "first value = {first}, last = {last}",
+        "changePct": ", change = {pct}%",
+        "peak": "peak at {label} = {value}",
+        "by": "by {dim}: {n} categories, top is '{leader}' = {value}",
+        "share": " ({pct}% of total)",
+        "scope": " (computed on the {pct}% of rows that have a value)",
+        "top": "top {dim} values: {pairs}",
+    },
+}
+
+
 def facts_from_business(business: dict, table: str | None = None,
-                        labels: dict | None = None) -> list[str]:
+                        labels: dict | None = None,
+                        language: str = "en") -> list[str]:
     """قائمة حقائق مرقّمة تُمرَّر للنموذج — لا يُسمح له بأرقام خارجها.
 
-    الأعمدة تُذكر بتسميتها الوصفية حتى يكتب النموذج لغة أعمال لا أسماء جداول.
+    الأعمدة تُذكر بتسميتها الوصفية، والمفردات بلغة التقرير، حتى يكتب النموذج
+    لغة أعمال سليمة لا مزيجاً من أسماء الأعمدة ومصطلحات إنجليزية.
     """
     labels = labels or {}
+    w = _FACT_WORDS.get(language, _FACT_WORDS["en"])
     lbl = lambda c: labels.get(c, c)          # noqa: E731
     prefix = f"[{lbl(table)}] " if table else ""
     facts: list[str] = []
 
     for k in business["kpis"]:
-        col = f" of {lbl(k['column'])}" if k.get("column") else ""
-        facts.append(f"{prefix}{k['key']}{col} = {k['value']}")
+        name = w[k["key"]].format(m=lbl(k["column"])) if k.get("column") else w[k["key"]]
+        facts.append(f"{prefix}{name} = {k['value']}")
 
     tr = business.get("trend")
     if tr:
-        facts.append(f"{prefix}period from {tr['period'][0]} to {tr['period'][1]}")
-        facts.append(f"{prefix}first {tr['granularity']} value = {tr['first']}, "
-                     f"last = {tr['last']}"
-                     + (f", change = {tr['change_pct']}%" if tr["change_pct"] is not None else ""))
-        facts.append(f"{prefix}peak at {tr['peak_label']} = {tr['peak_value']}")
+        facts.append(prefix + w["period"].format(a=tr["period"][0], b=tr["period"][1]))
+        facts.append(prefix + w["change"].format(first=tr["first"], last=tr["last"])
+                     + (w["changePct"].format(pct=tr["change_pct"])
+                        if tr["change_pct"] is not None else ""))
+        facts.append(prefix + w["peak"].format(label=tr["peak_label"],
+                                               value=tr["peak_value"]))
 
     for b in business.get("breakdowns", []):
-        facts.append(
-            f"{prefix}by {lbl(b['column'])}: {b['categories']} categories, "
-            f"top is '{b['leader']}' = {b['leader_value']}"
-            + (f" ({b['leader_share_pct']}% of total)"
-               if b["leader_share_pct"] is not None else ""))
-        pairs = ", ".join(f"{l}={v}" for l, v in zip(b["labels"][:5], b["values"][:5]))
-        facts.append(f"{prefix}top {lbl(b['column'])} values: {pairs}")
+        scope = ("" if b.get("coverage_pct", 100) >= 95
+                 else w["scope"].format(pct=b["coverage_pct"]))
+        share = (w["share"].format(pct=b["leader_share_pct"])
+                 if b["leader_share_pct"] is not None else "")
+        facts.append(prefix + w["by"].format(
+            dim=lbl(b["column"]), n=b["categories"], leader=b["leader"],
+            value=b["leader_value"]) + share + scope)
+        if b["categories"] > 2:
+            pairs = ", ".join(f"{l}={v}" for l, v in zip(b["labels"][:5], b["values"][:5]))
+            facts.append(prefix + w["top"].format(dim=lbl(b["column"]), pairs=pairs))
 
     return facts

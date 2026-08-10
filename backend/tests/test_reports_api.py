@@ -173,9 +173,10 @@ def test_analyze_whole_database_multi_report(client, tmp_path):
     meta = status["report"]
 
     html = client.get(f"/api/reports/{meta['id']}/html").text
-    assert "cities" in html and "sales" in html          # قسم لكل جدول
-    assert "العلاقات" in html                             # قسم العلاقات
-    assert "chart-sales-1" in html or "chart-cities-1" in html
+    # الجداول تظهر بتسمياتها الوصفية لا بأسمائها الخام في القاعدة
+    assert "المبيعات" in html and "Cities" in html
+    assert "قاموس البيانات" in html                       # ملحق الأعمدة المضغوط
+    assert "العلاقات" not in html                         # داخليات لا تخص المدير
 
     import io
 

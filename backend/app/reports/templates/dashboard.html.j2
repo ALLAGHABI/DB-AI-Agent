@@ -1,0 +1,110 @@
+{% extends "_base.html.j2" %}
+{% import "_macros.html.j2" as m %}
+
+{% block page_css %}
+@page { size: A4 landscape; margin: 9mm; }
+.appbar {
+  background: linear-gradient(120deg, var(--brand-deep), #065f46);
+  color: #fff; padding: 15px 22px; position: relative; overflow: hidden;
+}
+.appbar::after {
+  content: ''; position: absolute; inset: 0; opacity: .07;
+  background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 12px 12px;
+}
+.appbar-in { max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap;
+  align-items: center; justify-content: space-between; gap: 12px; position: relative; }
+.appbar h1 { font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+.appbar .mark { font-size: 11px; letter-spacing: .16em; opacity: .75; text-transform: uppercase; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pills span {
+  border: 1px solid rgb(255 255 255 / .28); background: rgb(255 255 255 / .1);
+  border-radius: 999px; padding: 2px 10px; font-size: 11px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding: 16px 22px 26px; }
+.strap {
+  font-size: 13px; color: var(--ink-2); background: var(--card); border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--brand); border-radius: 10px; padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.grid12 { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+.grid12 > .kpi { grid-column: span 3; }
+.rail { grid-column: span 4; }
+.rail ol.findings li { font-size: 12.5px; }
+.band-head {
+  grid-column: span 12; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-3); margin-top: 4px;
+}
+.conc { grid-column: span 4; }
+@media print {
+  .grid12 { grid-template-columns: repeat(8, 1fr); gap: 10px; }
+  .grid12 > .kpi { grid-column: span 2; }
+  .card, .rail { break-inside: avoid; }
+  .cwrap { height: 175px; } .cwrap.hero { height: 205px; }
+  .rail { grid-column: span 3; }
+  .card.chart-card[style] { grid-column: span 4 !important; }
+}
+@media (max-width: 900px) {
+  .grid12 { grid-template-columns: repeat(4, 1fr); }
+  .grid12 > .kpi, .rail, .conc, .card.chart-card[style] { grid-column: span 4 !important; }
+}
+{% endblock %}
+
+{% block content %}
+<header class="appbar">
+  <div class="appbar-in">
+    <div>
+      <div class="mark">SmartDB · {{ variant_badge }}</div>
+      <h1>{{ title }}</h1>
+    </div>
+    <div class="pills">
+      {% if period %}<span class="num">{{ period[0] }} → {{ period[1] }}</span>{% endif %}
+      <span class="num">{{ t.rows }}: {{ "{:,}".format(profile.overview.rows) }}</span>
+      <span><bdi>{{ source_name }}</bdi></span>
+      <span class="num">{{ created_at }}</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  {% if 'summary' in sections and insights.summary %}
+  <div class="strap">{{ insights.summary }}</div>
+  {% endif %}
+
+  <div class="grid12">
+    {% for k in kpis[:6] %}{{ m.kpi_card(k) }}{% endfor %}
+
+    {% if hero %}{{ m.chart_card(hero, hero=true) }}{% endif %}
+
+    {% if 'findings' in sections and insights.findings %}
+    <div class="card rail">
+      <div class="kicker">{{ t.findings }}</div>
+      <ol class="findings" style="margin-top:8px">
+        {% for f in insights.findings[:5] %}<li>{{ f }}</li>{% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+
+    {% if concentration %}{{ m.conc_card(concentration, t) }}{% endif %}
+
+    {% set ns = namespace(band=None) %}
+    {% for c in tiles %}
+      {% if c.band and c.band != ns.band %}
+        {% set ns.band = c.band %}
+        <div class="band-head">{{ t.table }}: {{ c.band }}</div>
+      {% endif %}
+      {{ m.chart_card(c) }}
+    {% endfor %}
+
+    {% if 'recommendations' in sections and insights.recommendations %}
+    <div class="card" style="grid-column: span 12">
+      <div class="kicker">{{ t.recommendations }}</div>
+      <ul class="recs" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));display:grid">
+        {% for r in insights.recommendations %}<li>{{ r }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  {{ m.report_foot(t, created_at, model_label, source_name, quality_note, dropped_claims) }}
+</div>
+{% endblock %}

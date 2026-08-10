@@ -1,0 +1,72 @@
+{% macro delta_pill(pct) -%}
+  {%- if pct is not none -%}
+    {%- set dir = 'up' if pct > 1 else ('down' if pct < -1 else 'flat') -%}
+    {#- السهم يحمل الاتجاه، فلا نكرره بإشارة تلتبس في الاتجاه من اليمين لليسار -#}
+    <span class="delta {{ dir }}">{{ '▲' if dir == 'up' else ('▼' if dir == 'down' else '■') }}
+      <span dir="ltr">{{ '%.1f'|format(pct if pct >= 0 else -pct) }}%</span></span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro kpi_card(k) -%}
+<div class="kpi">
+  <div class="k-label" title="{{ k.label }}">{{ k.label }}</div>
+  <div class="k-value">{{ k.value }}</div>
+  <div class="k-foot">
+    {{ delta_pill(k.delta) }}
+    {%- if k.spark %}
+    <svg class="spark" width="120" height="26" viewBox="0 0 120 26" fill="none" aria-hidden="true">
+      <polyline points="{{ k.spark }}" fill="none" stroke="var(--brand)" stroke-width="1.6"
+        stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
+    </svg>
+    {%- endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro chart_card(c, hero=false) -%}
+<div class="card chart-card"{% if c.slot %} style="grid-column: span {{ c.slot }}"{% endif %}>
+  <h3>{% if c.band %}{{ c.band }} · {% endif %}{{ c.heading }}</h3>
+  <div class="cwrap{% if hero %} hero{% endif %}"><canvas id="{{ c.id }}"></canvas></div>
+</div>
+{%- endmacro %}
+
+{% macro conc_card(concentration, t) -%}
+<div class="card conc">
+  <h3>{{ t.concentrationTitle }}</h3>
+  <div class="gwrap"><canvas id="conc-gauge"></canvas>
+    <div class="gval">{{ concentration.pct }}%</div>
+  </div>
+  <p>{{ concentration.text }}</p>
+</div>
+{%- endmacro %}
+
+{% macro rank_table(block, t) -%}
+<table class="grid">
+  <thead><tr>
+    <th style="width:34px">{{ t.rank }}</th><th>{{ t.category }}</th>
+    <th class="n">{{ t.value }}</th><th style="width:96px">{{ t.share }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in block.rows %}
+    <tr{% if r.rank is none %} class="rest"{% endif %}>
+      <td class="n">{{ r.rank if r.rank else '—' }}</td>
+      <td>{{ r.label }}</td>
+      <td class="n">{{ r.value }}</td>
+      <td class="bar-cell">
+        {%- if r.pct is not none %}<span class="n">{{ r.pct }}%</span>
+        <i style="width: {{ r.pct }}%"></i>{% else %}—{% endif -%}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{%- endmacro %}
+
+{% macro report_foot(t, created_at, model_label, source_name, quality_note, dropped) -%}
+<footer class="report-foot">
+  <span>{{ quality_note }}</span>
+  <span>SmartDB · {{ t.footer }} · {{ model_label }} · {{ created_at }}
+    · <bdi dir="ltr">ALI ALLAGHABI · ALI.ALLAGHABI@gmail.com</bdi></span>
+</footer>
+{%- if dropped %}<p style="font-size:10.5px;color:var(--ink-3);margin-top:6px">{{ t.droppedNote }}</p>{% endif %}
+{%- endmacro %}

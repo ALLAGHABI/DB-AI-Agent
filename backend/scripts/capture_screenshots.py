@@ -30,7 +30,7 @@ def main():
         # عربي داكن (الافتراضي)
         page.goto(APP, wait_until="networkidle")
         # اتصال بالقاعدة التجريبية
-        page.get_by_role("button", name="اتصال").click()
+        page.get_by_role("button", name="اتصال", exact=True).click()
         page.wait_for_timeout(1500)
 
         # 1) الاستعلام الذكي مع نتائج (استعلام مباشر لتفادي انتظار النموذج)
@@ -59,9 +59,12 @@ def main():
         page.wait_for_timeout(1500)
         shot(page, "er-diagram-ar-dark")
 
-        # 4) التقارير
-        page.get_by_role("tab", name="التقارير").click()
+        # 4) استوديو التقارير — بعد التحليل ليظهر مخطط التقرير لا شاشة رفع فارغة
+        page.goto(f"{APP}/?mode=reports", wait_until="networkidle")
         page.wait_for_timeout(1200)
+        page.get_by_role("button", name="حلّل القاعدة كاملة").click()
+        page.wait_for_selector("text=مخطط التقرير", timeout=60000)
+        page.wait_for_timeout(2500)
         shot(page, "reports-studio-ar-dark")
 
         # 5) الرئيسية بالإنجليزية فاتح
@@ -77,8 +80,9 @@ def main():
         if reports:
             page.goto(f"http://127.0.0.1:8000/api/reports/{reports[0]['id']}/html",
                       wait_until="networkidle")
-            page.wait_for_timeout(1500)
-            shot(page, "report-ar")
+            page.wait_for_timeout(1800)
+            page.screenshot(path=os.path.join(OUT, "report-ar.png"), full_page=True)
+            print("✓ report-ar.png")
 
         browser.close()
 

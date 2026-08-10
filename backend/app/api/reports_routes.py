@@ -11,6 +11,7 @@ from ..reports import exporter
 from ..reports.analyzer import MAX_DATASETS, profile_datasets, profile_df
 from ..reports.business import analyze_business, facts_from_business
 from ..reports.builder import build_report_html
+from ..reports.labels import label_columns
 from ..reports.insights import generate_insights
 from ..reports.store import ReportStore
 from ..config import settings
@@ -29,6 +30,7 @@ MAX_TABLE_ROWS = 100_000
 
 class AnalyzeTablesIn(BaseModel):
     tables: list[str] = []          # فارغة = كل جداول القاعدة
+    language: str = "ar"            # لغة التسميات المقترحة
 
 
 @router.post("/analyze-table")
@@ -65,20 +67,23 @@ def analyze_tables(body: AnalyzeTablesIn):
 
     semantics = {name: analyze_business(df)["semantics"]
                  for name, df in frames.items() if not df.empty}
+    all_columns = sorted({c for df in frames.values() for c in df.columns})
+    labels = label_columns(all_columns + list(frames), body.language)
 
     if len(frames) == 1:
         name, df = next(iter(frames.items()))
         return {"token": _store().save_temp(df, name),
-                "profile": profile_df(df), "semantics": semantics}
+                "profile": profile_df(df), "semantics": semantics, "labels": labels}
 
     profile = profile_datasets(frames, relationships)
     source = state.db.dialect or "database"
     token = _store().save_temp(frames, source, relationships)
-    return {"token": token, "profile": profile, "semantics": semantics}
+    return {"token": token, "profile": profile,
+            "semantics": semantics, "labels": labels}
 
 
 @router.post("/analyze")
-async def analyze(file: UploadFile = File(...)):
+async def analyze(file: UploadFile = File(...), language: str = Form("ar")):
     data = await file.read()
     try:
         df = transfer.read_upload(file.filename or "upload", data)
@@ -92,7 +97,8 @@ async def analyze(file: UploadFile = File(...)):
     token = _store().save_temp(df, file.filename or "upload")
     name = file.filename or "upload"
     return {"token": token, "profile": profile,
-            "semantics": {name: analyze_business(df)["semantics"]}}
+            "semantics": {name: analyze_business(df)["semantics"]},
+            "labels": label_columns([str(c) for c in df.columns], language)}
 
 
 class GenerateIn(BaseModel):
@@ -103,6 +109,7 @@ class GenerateIn(BaseModel):
     provider: str
     model: str
     overrides: dict | None = None        # {table: {measure, date, dimensions}}
+    labels: dict | None = None           # {column: "تسمية وصفية"}
 
 
 @router.post("/generate")
@@ -128,13 +135,17 @@ def generate(body: GenerateIn):
 
         # أرقام الأعمال الحقيقية — هي وحدها ما يراه النموذج
         business, facts = {}, []
+        # تسميات وصفية للأعمدة والجداول — التقرير يتحدث لغة الأعمال
+        all_columns = {c for df in frames.values() for c in df.columns}
+        labels = label_columns(sorted(all_columns) + list(frames),
+                               body.language, body.labels)
         for name, df in frames.items():
             if df.empty:
                 continue
             label = name if len(frames) > 1 else None
             b = analyze_business(df, body.overrides.get(name) if body.overrides else None)
             business[name] = b
-            facts.extend(facts_from_business(b, label))
+            facts.extend(facts_from_business(b, label, labels))
         profile = {**profile, "business": business}
 
         try:
@@ -152,7 +163,7 @@ def generate(body: GenerateIn):
             title=body.title, profile=profile, insights=insights,
             language=body.language, variant=body.template,
             source_name=source_name, model_label=model_label,
-            created_at=created_at)
+            created_at=created_at, labels=labels)
         xlsx = exporter.to_xlsx(profile, insights, body.language)
         try:
             pdf = exporter.to_pdf(html)

@@ -238,3 +238,56 @@ def test_job_failure_is_reported_with_a_code(client):
 
 def test_unknown_job_is_404(client):
     assert client.get("/api/reports/jobs/nope").status_code == 404
+
+
+def test_analyze_returns_descriptive_labels(client, tmp_path):
+    """التقرير يتحدث لغة الأعمال: total_amount → قيمة المبيعات."""
+    import sqlite3
+    db = tmp_path / "shop.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE orders (id INTEGER PRIMARY KEY, city TEXT,"
+        " order_date TEXT, total_amount REAL);"
+        "INSERT INTO orders (city, order_date, total_amount)"
+        " VALUES ('الرياض','2025-01-01',100),('جدة','2025-02-01',250);")
+    con.commit(); con.close()
+    client.post("/api/db/connect", json={"url": f"sqlite:///{db}"})
+
+    labels = client.post("/api/reports/analyze-table",
+                         json={"tables": ["orders"], "language": "ar"}).json()["labels"]
+    assert labels["total_amount"] == "قيمة المبيعات"
+    assert labels["city"] == "المدينة"
+    assert labels["order_date"] == "تاريخ الطلب"
+    assert labels["orders"] == "الطلبات"
+
+    en = client.post("/api/reports/analyze-table",
+                     json={"tables": ["orders"], "language": "en"}).json()["labels"]
+    assert en["total_amount"] == "Sales value"
+
+
+@respx.mock
+def test_report_uses_labels_not_raw_column_names(client, tmp_path):
+    import sqlite3
+    db = tmp_path / "shop2.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE orders (id INTEGER PRIMARY KEY, city TEXT, total_amount REAL);"
+        "INSERT INTO orders (city, total_amount) VALUES ('الرياض',100),('جدة',250);")
+    con.commit(); con.close()
+    client.post("/api/db/connect", json={"url": f"sqlite:///{db}"})
+    token = client.post("/api/reports/analyze-table",
+                        json={"tables": ["orders"]}).json()["token"]
+
+    respx.get("http://localhost:11434/api/tags").mock(
+        return_value=Response(200, json={"models": [{"name": "gemma3:4b"}]}))
+    respx.post("http://localhost:11434/api/chat").mock(
+        return_value=Response(200, json={"message": {"content": FAKE_INSIGHTS}}))
+
+    _, status = _generate(client, token=token, title="ت", template="executive",
+                          language="ar", provider="ollama", model="gemma3:4b",
+                          labels={"city": "الفرع"})
+    assert status["status"] == "done", status
+    html = client.get(f"/api/reports/{status['report']['id']}/html").text
+    assert "قيمة المبيعات" in html          # تسمية تلقائية
+    assert "الفرع" in html                   # تسمية كتبها المستخدم
+    assert "total_amount" not in html.split("<script")[0]   # لا أسماء خام في المتن

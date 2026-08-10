@@ -109,9 +109,10 @@ export const api = {
     `/api/db/table/${encodeURIComponent(table)}/export?format=${fmt}`,
   backupUrl: () => '/api/db/backup',
 
-  reportAnalyze: (file: File) => {
+  reportAnalyze: (file: File, language: string) => {
     const fd = new FormData();
     fd.append('file', file);
+    fd.append('language', language);
     return request('/api/reports/analyze', { method: 'POST', body: fd })
       .then(r => j<AnalyzeResult>(r));
   },
@@ -119,6 +120,7 @@ export const api = {
     token: string; title: string; template: string; language: string;
     provider: string; model: string;
     overrides?: Record<string, SemanticOverride>;
+    labels?: Record<string, string>;
   }) => post('/api/reports/generate', body).then(r => j<{ job_id: string; status: string }>(r)),
   reportJob: (jobId: string) =>
     request(`/api/reports/jobs/${jobId}`).then(r => j<ReportJob>(r)),
@@ -126,8 +128,8 @@ export const api = {
   reportDelete: (id: string) =>
     request(`/api/reports/${id}`, { method: 'DELETE' }).then(r => j<{ success: boolean }>(r)),
   reportFileUrl: (id: string, kind: 'html' | 'pdf' | 'xlsx') => `/api/reports/${id}/${kind}`,
-  reportAnalyzeTables: (tables: string[]) =>
-    post('/api/reports/analyze-table', { tables })
+  reportAnalyzeTables: (tables: string[], language: string) =>
+    post('/api/reports/analyze-table', { tables, language })
       .then(r => j<AnalyzeResult>(r)),
 
   historyList: (favoritesOnly = false, limit = 50) =>
@@ -157,7 +159,9 @@ export const api = {
 export type Semantics = { measures: string[]; dates: string[]; dimensions: string[] };
 export type SemanticOverride = { measure?: string | null; date?: string | null; dimensions?: string[] };
 export type AnalyzeResult = {
-  token: string; profile: ReportProfile; semantics?: Record<string, Semantics>;
+  token: string; profile: ReportProfile;
+  semantics?: Record<string, Semantics>;
+  labels?: Record<string, string>;
 };
 
 export type ReportJob =

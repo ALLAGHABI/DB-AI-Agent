@@ -65,19 +65,24 @@ def _format_number(value) -> str:
         else f"{value:,}"
 
 
-def _business_view(business: dict, strings: dict, max_charts: int) -> tuple[list, list]:
+def _business_view(business: dict, strings: dict, max_charts: int,
+                   labels: dict | None = None) -> tuple[list, list]:
     """يحوّل أرقام الأعمال إلى بطاقات مؤشرات ورسوم جاهزة للقالب."""
     kpi_labels = {"records": "kpiRecords", "total": "kpiTotal",
                   "average": "kpiAverage", "highest": "kpiHighest"}
+    labels = labels or {}
+    lbl = lambda c: labels.get(c, c)          # noqa: E731
     kpis, charts = [], []
     multi = len(business) > 1
 
     for table, b in business.items():
-        prefix = f"{table} · " if multi else ""
+        prefix = f"{lbl(table)} · " if multi else ""
         for k in b["kpis"]:
             if len(kpis) >= 4 and not multi:
                 break
             label = strings.get(kpi_labels.get(k["key"], ""), k["key"])
+            if k.get("column"):               # "الإجمالي" وحدها غامضة
+                label = f"{label} · {lbl(k['column'])}"
             kpis.append({"display": _format_number(k["value"]),
                          "label": prefix + label})
 
@@ -86,14 +91,16 @@ def _business_view(business: dict, strings: dict, max_charts: int) -> tuple[list
             charts.append({
                 "id": f"bchart-{len(charts) + 1}", "type": "line",
                 "heading": prefix + strings["trendOf"].format(
-                    measure=tr["measure"] or strings["kpiRecords"]),
+                    measure=lbl(tr["measure"]) if tr["measure"] else strings["kpiRecords"]),
                 "labels": tr["labels"], "values": tr["values"],
             })
         for bd in b.get("breakdowns", []):
             if len(charts) >= max_charts:
                 break
-            heading = (strings["byDim"].format(measure=bd["measure"], dim=bd["column"])
-                       if bd["measure"] else strings["countByDim"].format(dim=bd["column"]))
+            heading = (strings["byDim"].format(measure=lbl(bd["measure"]),
+                                               dim=lbl(bd["column"]))
+                       if bd["measure"]
+                       else strings["countByDim"].format(dim=lbl(bd["column"])))
             charts.append({
                 "id": f"bchart-{len(charts) + 1}", "type": "bar",
                 "heading": prefix + heading,
@@ -105,7 +112,8 @@ def _business_view(business: dict, strings: dict, max_charts: int) -> tuple[list
 
 def build_report_html(*, title: str, profile: dict, insights: dict, language: str,
                       variant: str, source_name: str, model_label: str,
-                      created_at: str, brand_color: str = "#059669") -> str:
+                      created_at: str, brand_color: str = "#059669",
+                      labels: dict | None = None) -> str:
     if variant not in ("executive", "detailed", "dashboard"):
         raise AppError("unknownTemplate", template=variant)
     if language not in _STRINGS:
@@ -129,7 +137,7 @@ def build_report_html(*, title: str, profile: dict, insights: dict, language: st
     strings = _STRINGS[language]
     max_business_charts = 3 if variant == "executive" else 8
     kpis, business_charts = _business_view(
-        profile.get("business", {}), strings, max_business_charts)
+        profile.get("business", {}), strings, max_business_charts, labels)
     charts = business_charts + charts
 
     template = _env.get_template("report.html.j2")

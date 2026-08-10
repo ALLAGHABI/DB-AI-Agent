@@ -27,8 +27,9 @@ export function ModeSwitch({ mode, onChange }: {
               ${active
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'}`}>
-            <Icon className={`h-3.5 w-3.5 ${active ? 'text-primary' : ''}`} aria-hidden />
-            <span className="hidden sm:inline">{t(id)}</span>
+            <Icon className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-primary' : ''}`} aria-hidden />
+            {/* التسمية ملاحة أساسية — تظهر دائماً مهما ضاقت النافذة */}
+            <span className="whitespace-nowrap">{t(id)}</span>
           </button>
         );
       })}

@@ -41,14 +41,14 @@ export function Shell({ sidebar, main, connected, apiDown = false, modeSwitch, s
         {t('skipToContent')}
       </a>
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+        <div className="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <Database className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-sm font-bold leading-tight">{t('name')}</h1>
-              <p className="hidden text-xs text-muted-foreground leading-tight sm:block">{t('tagline')}</p>
+              <h1 className="truncate text-sm font-bold leading-tight">{t('name')}</h1>
+              <p className="truncate text-xs text-muted-foreground leading-tight">{t('tagline')}</p>
             </div>
           </div>
           {modeSwitch}

@@ -2,7 +2,16 @@
   "app": {
     "name": "SmartDB",
     "tagline": "بياناتك لا تغادر جهازك",
-    "builtBy": "تطوير"
+    "builtBy": "تطوير",
+    "skipToContent": "تخطَّ إلى المحتوى",
+    "apiDown": "تعذر الوصول إلى خادم SmartDB — تأكد أنه يعمل",
+    "settingsRegion": "الإعدادات والاتصال",
+    "switchLanguage": "تبديل اللغة",
+    "switchToLight": "التبديل إلى الوضع الفاتح",
+    "switchToDark": "التبديل إلى الوضع الداكن",
+    "close": "إغلاق",
+    "metaTitle": "مدير قواعد البيانات الذكي",
+    "metaDescription": "إدارة قواعد البيانات وتوليد التقارير بالذكاء الاصطناعي المحلي"
   },
   "status": {
     "connected": "متصل",
@@ -33,7 +42,14 @@
     "rows": "صف",
     "affected": "صفوف متأثرة",
     "needsSetup": "اتصل بقاعدة بيانات واختر نموذجاً للبدء",
-    "emptyHint": "النتائج ستظهر هنا"
+    "emptyHint": "النتائج ستظهر هنا",
+    "rowCount": "{count, plural, =0 {لا توجد صفوف} one {صف واحد} two {صفّان} few {# صفوف} other {# صفاً}}",
+    "affectedCount": "{count, plural, =0 {لم يتأثر أي صف} one {تأثر صف واحد} two {تأثر صفّان} few {تأثرت # صفوف} other {تأثر # صفاً}}",
+    "step1": "اتصل بقاعدة بيانات من الشريط الجانبي",
+    "step2": "اختر نموذج ذكاء اصطناعي",
+    "example1": "أظهر أفضل 5 منتجات مبيعاً",
+    "example2": "كم عدد العملاء في كل مدينة؟",
+    "example3": "إجمالي المبيعات شهرياً"
   },
   "tables": {
     "pick": "اختر جدولاً",
@@ -43,7 +59,7 @@
     "add": "أضف",
     "deleteSelected": "حذف المحدد",
     "deleteConfirmTitle": "حذف الصفوف المحددة؟",
-    "deleteConfirmBody": "سيتم حذف {count} صف نهائياً.",
+    "deleteConfirmBody": "{count, plural, one {سيُحذف صف واحد نهائياً.} two {سيُحذف صفّان نهائياً.} few {ستُحذف # صفوف نهائياً.} other {سيُحذف # صفاً نهائياً.}}",
     "editHint": "انقر مرتين على أي خلية للتعديل — Enter للحفظ، Esc للإلغاء",
     "saved": "تم الحفظ",
     "deleted": "تم الحذف",
@@ -61,17 +77,28 @@
     "backup": "نسخة احتياطية",
     "noPk": "هذا الجدول بلا مفتاح أساسي — التحرير معطل",
     "rows": "صف",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "selectAll": "تحديد كل الصفوف",
+    "selectRow": "تحديد الصف {n}",
+    "primaryKey": "مفتاح أساسي",
+    "deletedCount": "حُذف {ok} من {total}",
+    "importFile": "الملف",
+    "needsConnection": "اتصل بقاعدة بيانات لتصفح الجداول",
+    "rowCount": "{count, plural, =0 {لا توجد صفوف} one {صف واحد} two {صفّان} few {# صفوف} other {# صفاً}}"
   },
   "er": {
     "empty": "اتصل بقاعدة بيانات لعرض المخطط",
-    "rows": "صف"
+    "rows": "صف",
+    "loadFailed": "تعذر تحميل المخطط",
+    "retry": "إعادة المحاولة",
+    "noTables": "لا توجد جداول في هذه القاعدة"
   },
   "sqlEditor": {
     "run": "تنفيذ",
     "running": "جارٍ التنفيذ…",
     "placeholder": "-- اكتب SQL هنا",
-    "hint": "الاستعلامات المعدِّلة ستطلب تأكيداً قبل التنفيذ"
+    "hint": "الاستعلامات المعدِّلة ستطلب تأكيداً قبل التنفيذ",
+    "needsConnection": "اتصل بقاعدة بيانات أولاً"
   },
   "connections": {
     "title": "قاعدة البيانات",
@@ -136,6 +163,48 @@
     "generated": "تم توليد التقرير",
     "localBadge": "محلي",
     "cloudBadge": "سحابي",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "deleted": "تم حذف التقرير",
+    "open": "افتح التقرير"
+  },
+  "errors": {
+    "generic": "حدث خطأ غير متوقع",
+    "network": "تعذر الوصول إلى خادم SmartDB — تأكد أنه يعمل",
+    "notConnected": "لا يوجد اتصال بقاعدة بيانات",
+    "connectFailed": "فشل الاتصال: {detail}",
+    "dbFileMissing": "ملف قاعدة البيانات غير موجود: {path}",
+    "tableMissing": "جدول غير موجود: {table}",
+    "unknownSortColumn": "عمود غير معروف للفرز: {column}",
+    "badSortDirection": "اتجاه الفرز يجب أن يكون تصاعدياً أو تنازلياً",
+    "unknownColumns": "أعمدة غير معروفة: {columns}",
+    "emptyValues": "لم تُدخل أي قيم",
+    "noPrimaryKey": "هذا الجدول بلا مفتاح أساسي — التحرير غير مدعوم",
+    "incompletePrimaryKey": "يجب تحديد قيم المفتاح الأساسي كاملة",
+    "insertFailed": "فشل الإدراج: {detail}",
+    "updateFailed": "فشل التعديل: {detail}",
+    "deleteFailed": "فشل الحذف: {detail}",
+    "executeFailed": "خطأ في التنفيذ: {detail}",
+    "sqlParseFailed": "تعذر تحليل الاستعلام: {detail}",
+    "singleStatementOnly": "يُسمح باستعلام واحد فقط في كل طلب",
+    "writeNeedsConfirm": "هذا الاستعلام يعدّل البيانات — يتطلب تأكيداً صريحاً",
+    "fileTooLarge": "حجم الملف يتجاوز الحد الأقصى ({limit})",
+    "unsupportedFormat": "صيغة غير مدعومة — المدعوم: CSV و Excel و JSON",
+    "badImportMode": "وضع استيراد غير صالح",
+    "tableExists": "الجدول موجود مسبقاً: {table} — استخدم وضع الإلحاق",
+    "tableMissingForAppend": "الجدول غير موجود: {table} — استخدم وضع الإنشاء",
+    "badExportFormat": "صيغة التصدير المدعومة: CSV أو Excel",
+    "backupSqliteOnly": "النسخ الاحتياطي المباشر متاح لقواعد SQLite فقط حالياً",
+    "importFailed": "فشل الاستيراد: {detail}",
+    "fileReadFailed": "تعذر قراءة الملف: {detail}",
+    "emptyFile": "الملف لا يحتوي بيانات",
+    "unknownProvider": "مزود غير معروف: {provider}",
+    "generateFailed": "فشل توليد الاستعلام: {detail}",
+    "insightsFailed": "فشل توليد الرؤى: {detail}",
+    "analysisExpired": "انتهت جلسة التحليل — أعد رفع الملف",
+    "fileMissing": "الملف غير موجود",
+    "reportMissing": "التقرير غير موجود",
+    "unknownFileKind": "نوع ملف غير معروف: {kind}",
+    "unknownTemplate": "قالب غير معروف: {template}",
+    "unsupportedLanguage": "لغة غير مدعومة: {language}"
   }
 }

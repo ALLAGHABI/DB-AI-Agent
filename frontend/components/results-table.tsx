@@ -3,8 +3,8 @@ import {
   createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel,
   useReactTable, type SortingState,
 } from '@tanstack/react-table';
-import { ArrowUpDown } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -14,6 +14,7 @@ type Row = Record<string, unknown>;
 
 export function ResultsTable({ columns, rows }: { columns: string[]; rows: unknown[][] }) {
   const t = useTranslations('query');
+  const format = useFormatter();
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const data = useMemo<Row[]>(
@@ -26,19 +27,26 @@ export function ResultsTable({ columns, rows }: { columns: string[]; rows: unkno
     () => columns.map(c =>
       helper.accessor(row => row[c], {
         id: c,
-        header: ({ column }) => (
-          <button type="button" className="flex cursor-pointer items-center gap-1 font-mono text-xs font-semibold"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-            {c}<ArrowUpDown className="h-3 w-3 opacity-50" />
-          </button>
-        ),
+        header: ({ column }) => {
+          const dir = column.getIsSorted();
+          const Icon = dir === 'asc' ? ArrowUp : dir === 'desc' ? ArrowDown : ArrowUpDown;
+          return (
+            <button type="button" className="flex cursor-pointer items-center gap-1 font-mono text-xs font-semibold"
+              onClick={() => column.toggleSorting(dir === 'asc')}>
+              {c}<Icon className={`h-3 w-3 ${dir ? 'text-primary' : 'opacity-50'}`} />
+            </button>
+          );
+        },
         cell: info => {
           const v = info.getValue();
           if (v === null || v === undefined) return <span className="text-muted-foreground">—</span>;
-          return String(v);
+          if (typeof v === 'number') {
+            return <span className="block text-end font-mono tabular-nums">{format.number(v)}</span>;
+          }
+          return <bdi>{String(v)}</bdi>;
         },
       })),
-    [columns, helper],
+    [columns, helper, format],
   );
 
   const table = useReactTable({
@@ -78,7 +86,7 @@ export function ResultsTable({ columns, rows }: { columns: string[]; rows: unkno
           </TableBody>
         </Table>
       </div>
-      <div className="pt-2 text-xs text-muted-foreground">{rows.length} {t('rows')}</div>
+      <div className="pt-2 text-xs text-muted-foreground">{t('rowCount', { count: rows.length })}</div>
     </div>
   );
 }

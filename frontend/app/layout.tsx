@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans_Arabic, Inter } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
@@ -13,10 +13,10 @@ const plexArabic = IBM_Plex_Sans_Arabic({
   variable: '--font-arabic',
 });
 
-export const metadata: Metadata = {
-  title: 'SmartDB — AI Database Manager',
-  description: 'Local-first AI database management & reporting',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('app');
+  return { title: `${t('name')} — ${t('metaTitle')}`, description: t('metaDescription') };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
@@ -32,7 +32,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <NextIntlClientProvider messages={messages}>
             {children}
-            <Toaster richColors position={dir === 'rtl' ? 'bottom-left' : 'bottom-right'} />
+            <Toaster richColors closeButton duration={8000}
+              position={dir === 'rtl' ? 'bottom-left' : 'bottom-right'} />
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>

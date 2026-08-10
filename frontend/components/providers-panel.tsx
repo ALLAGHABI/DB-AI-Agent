@@ -3,6 +3,7 @@ import { Cloud, Cpu, RefreshCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { useApiError } from '@/lib/use-api-error';
 import { api, type ProviderStatus } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ export type ModelSelection = { provider: string; model: string; isLocal: boolean
 
 export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSelection | null) => void }) {
   const t = useTranslations('settings');
+  const { showError } = useApiError();
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [selected, setSelected] = useState<ModelSelection | null>(null);
   const [orKey, setOrKey] = useState('');
@@ -41,7 +43,7 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
         return any ? { provider: any.id, model: any.models[0], isLocal: any.is_local } : null;
       });
     } catch (e) {
-      toast.error((e as Error).message);
+      showError(e);
     }
   }, []);
 
@@ -59,7 +61,7 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
       toast.success(t('saved'));
       await refresh();
     } catch (e) {
-      toast.error((e as Error).message);
+      showError(e);
     } finally {
       setBusy(false);
     }

@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, inspect, text
 
 from ..config import settings
 from .sql_guard import SqlClass, classify, ensure_limit
+from ..errors import AppError, NotFoundError
+from ..errors import ExecutionBlocked as _ExecutionBlocked
 
 _DIALECTS = {"sqlite": "sqlite", "mysql": "mysql", "postgresql": "postgres"}
 
@@ -19,22 +21,20 @@ def _resolve_sqlite_url(url: str) -> str:
     path = url[len("sqlite:///"):]
     if os.path.isabs(path):
         if not os.path.exists(path):
-            raise FileNotFoundError(f"ملف قاعدة البيانات غير موجود: {path}")
+            raise NotFoundError("dbFileMissing", path=path)
         return url
     for base in (os.getcwd(), os.path.dirname(os.getcwd())):
         candidate = os.path.join(base, path)
         if os.path.exists(candidate):
             return f"sqlite:///{os.path.abspath(candidate)}"
-    raise FileNotFoundError(f"ملف قاعدة البيانات غير موجود: {path}")
+    raise NotFoundError("dbFileMissing", path=path)
 
 
-class ExecutionBlocked(Exception):
-    """استعلام معدِّل بدون تأكيد صريح."""
+class ExecutionBlocked(_ExecutionBlocked):
+    """استعلام معدِّل بدون تأكيد صريح (يحمل رمز خطأ مترجَم في الواجهة)."""
 
     def __init__(self, sql_class: SqlClass, sql: str):
-        self.sql_class = sql_class
-        self.sql = sql
-        super().__init__(f"{sql_class.value} query requires confirmation")
+        super().__init__(sql_class.value, sql)
 
 
 @dataclass
@@ -128,7 +128,7 @@ class DatabaseManager:
     def _table_meta(self, table: str) -> dict:
         insp = inspect(self.engine)
         if table not in insp.get_table_names():
-            raise LookupError(f"جدول غير موجود: {table}")
+            raise NotFoundError("tableMissing", table=table)
         cols = [c["name"] for c in insp.get_columns(table)]
         try:
             pks = insp.get_pk_constraint(table).get("constrained_columns", [])
@@ -140,9 +140,9 @@ class DatabaseManager:
                     order_by: str | None = None, direction: str = "asc") -> dict:
         meta = self._table_meta(table)
         if order_by is not None and order_by not in meta["columns"]:
-            raise ValueError(f"عمود غير معروف للفرز: {order_by}")
+            raise AppError("unknownSortColumn", column=order_by)
         if direction not in ("asc", "desc"):
-            raise ValueError("اتجاه الفرز يجب أن يكون asc أو desc")
+            raise AppError("badSortDirection")
         qt = self._quote(table)
         order_sql = f" ORDER BY {self._quote(order_by)} {direction.upper()}" if order_by else ""
         with self.engine.connect() as conn:
@@ -158,16 +158,16 @@ class DatabaseManager:
                 "primary_keys": meta["primary_keys"],
             }
 
-    def _validate_columns(self, meta: dict, values: dict, what: str) -> None:
+    def _validate_columns(self, meta: dict, values: dict) -> None:
         unknown = set(values) - set(meta["columns"])
         if unknown:
-            raise ValueError(f"أعمدة غير معروفة في {what}: {', '.join(sorted(unknown))}")
+            raise AppError("unknownColumns", columns=", ".join(sorted(unknown)))
         if not values:
-            raise ValueError(f"{what} فارغ")
+            raise AppError("emptyValues")
 
     def insert_row(self, table: str, values: dict) -> dict:
         meta = self._table_meta(table)
-        self._validate_columns(meta, values, "القيم")
+        self._validate_columns(meta, values)
         cols = ", ".join(self._quote(c) for c in values)
         binds = ", ".join(f":{c}" for c in values)
         with self.engine.connect() as conn:
@@ -183,14 +183,14 @@ class DatabaseManager:
 
     def _pk_where(self, meta: dict, pk: dict) -> str:
         if not meta["primary_keys"]:
-            raise ValueError("الجدول بلا مفتاح أساسي — التحرير غير مدعوم")
+            raise AppError("noPrimaryKey")
         if set(pk) != set(meta["primary_keys"]):
-            raise ValueError("يجب تحديد قيم المفتاح الأساسي كاملة")
+            raise AppError("incompletePrimaryKey")
         return " AND ".join(f"{self._quote(c)} = :pk_{c}" for c in pk)
 
     def update_row(self, table: str, pk: dict, values: dict) -> int:
         meta = self._table_meta(table)
-        self._validate_columns(meta, values, "القيم")
+        self._validate_columns(meta, values)
         where = self._pk_where(meta, pk)
         sets = ", ".join(f"{self._quote(c)} = :{c}" for c in values)
         params = {**values, **{f"pk_{c}": v for c, v in pk.items()}}
@@ -212,7 +212,7 @@ class DatabaseManager:
 
     def execute(self, sql: str, confirm_write: bool = False) -> ExecResult:
         if not self.is_connected:
-            raise RuntimeError("لا يوجد اتصال بقاعدة البيانات")
+            raise AppError("notConnected")
         sql_class = classify(sql, self.dialect)
         if sql_class in (SqlClass.WRITE, SqlClass.DDL) and not confirm_write:
             raise ExecutionBlocked(sql_class, sql)

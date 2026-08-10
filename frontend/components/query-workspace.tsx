@@ -1,8 +1,9 @@
 'use client';
-import { Cloud, Cpu, Play, Sparkles } from 'lucide-react';
+import { Cloud, Cpu, Database, Play, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useApiError } from '@/lib/use-api-error';
 import { api, type ExecResult, type GenerateResult } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ export function QueryWorkspace({ connected, selection }: {
 }) {
   const t = useTranslations('query');
   const ts = useTranslations('status');
+  const { showError } = useApiError();
   const [request, setRequest] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
   const [generated, setGenerated] = useState<GenerateResult | null>(null);
@@ -42,7 +44,7 @@ export function QueryWorkspace({ connected, selection }: {
         setPendingWrite(gen);
       }
     } catch (e) {
-      toast.error((e as Error).message);
+      showError(e);
     } finally {
       setPhase('idle');
     }
@@ -55,9 +57,9 @@ export function QueryWorkspace({ connected, selection }: {
     try {
       const res = await api.execute(pendingWrite.sql, true);
       setResult(res);
-      toast.success(`${res.affected} ${t('affected')}`);
+      toast.success(t('affectedCount', { count: res.affected }));
     } catch (e) {
-      toast.error((e as Error).message);
+      showError(e);
     } finally {
       setPhase('idle');
     }
@@ -70,9 +72,27 @@ export function QueryWorkspace({ connected, selection }: {
           <CardTitle className="text-sm">{t('title')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Textarea rows={3} value={request} placeholder={t('placeholder')}
+          {!ready && (
+            <ol className="space-y-1.5 rounded-lg border border-dashed p-3 text-xs">
+              <li className={connected ? 'text-muted-foreground line-through' : 'font-medium'}>
+                <span className="me-1.5">①</span>{t('step1')}
+              </li>
+              <li className={selection ? 'text-muted-foreground line-through' : 'font-medium'}>
+                <span className="me-1.5">②</span>{t('step2')}
+              </li>
+            </ol>
+          )}
+          <Textarea rows={3} value={request} dir="auto" placeholder={t('placeholder')}
             onChange={e => setRequest(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run(); }} />
+          <div className="flex flex-wrap gap-1.5">
+            {['example1', 'example2', 'example3'].map(k => t(k)).map(ex => (
+              <button key={ex} type="button" onClick={() => setRequest(ex)}
+                className="cursor-pointer rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:bg-accent hover:text-foreground">
+                {ex}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between">
             {selection ? (
               <Badge variant="outline" className="gap-1.5 font-mono text-xs">
@@ -102,8 +122,13 @@ export function QueryWorkspace({ connected, selection }: {
               {result?.kind === 'rows'
                 ? <ResultsTable columns={result.columns} rows={result.rows} />
                 : result?.kind === 'affected'
-                  ? <div className="py-8 text-center text-sm">{result.affected} {t('affected')}</div>
-                  : <div className="py-12 text-center text-sm text-muted-foreground">{t('emptyHint')}</div>}
+                  ? <div className="py-8 text-center text-sm">{t('affectedCount', { count: result.affected })}</div>
+                  : (
+                    <div className="flex flex-col items-center gap-3 py-14 text-center">
+                      <Database className="h-10 w-10 text-primary/30" aria-hidden />
+                      <p className="text-sm text-muted-foreground">{t('emptyHint')}</p>
+                    </div>
+                  )}
             </TabsContent>
             <TabsContent value="sql" className="pt-3">
               <pre dir="ltr" className="overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm leading-relaxed">

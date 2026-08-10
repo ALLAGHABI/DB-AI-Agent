@@ -7,6 +7,7 @@ import time
 import uuid
 
 import pandas as pd
+from ..errors import AppError, NotFoundError
 
 
 class ReportStore:
@@ -27,7 +28,7 @@ class ReportStore:
     def load_temp(self, token: str) -> tuple[pd.DataFrame, str]:
         path = os.path.join(self.tmp, f"{os.path.basename(token)}.pkl")
         if not os.path.exists(path):
-            raise LookupError("جلسة التحليل انتهت — أعد رفع الملف")
+            raise NotFoundError("analysisExpired")
         with open(path, "rb") as f:
             data = pickle.load(f)
         return data["df"], data["source_name"]
@@ -72,15 +73,15 @@ class ReportStore:
     def get_file(self, report_id: str, kind: str) -> bytes:
         names = {"html": "report.html", "xlsx": "report.xlsx", "pdf": "report.pdf"}
         if kind not in names:
-            raise ValueError(f"نوع غير معروف: {kind}")
+            raise AppError("unknownFileKind", kind=kind)
         path = os.path.join(self.root, os.path.basename(report_id), names[kind])
         if not os.path.exists(path):
-            raise LookupError("الملف غير موجود")
+            raise NotFoundError("fileMissing")
         with open(path, "rb") as f:
             return f.read()
 
     def delete(self, report_id: str) -> None:
         d = os.path.join(self.root, os.path.basename(report_id))
         if not os.path.isdir(d):
-            raise LookupError("التقرير غير موجود")
+            raise NotFoundError("reportMissing")
         shutil.rmtree(d)

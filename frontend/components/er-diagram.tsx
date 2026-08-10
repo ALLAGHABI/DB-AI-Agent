@@ -6,8 +6,10 @@ import {
 import '@xyflow/react/dist/style.css';
 import { KeyRound, Link2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useApiError } from '@/lib/use-api-error';
 import { api, type TableSchema } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 type TableNodeData = { table: TableSchema; rowsLabel: string };
@@ -44,11 +46,22 @@ const nodeTypes = { table: TableNode };
 export function ErDiagram({ connected }: { connected: boolean }) {
   const t = useTranslations('er');
   const [tables, setTables] = useState<TableSchema[]>([]);
+  const [failed, setFailed] = useState(false);
+  const { showError } = useApiError();
 
-  useEffect(() => {
-    if (!connected) { setTables([]); return; }
-    api.schema().then(s => setTables(s.tables)).catch(() => setTables([]));
-  }, [connected]);
+  const load = useCallback(async () => {
+    if (!connected) { setTables([]); setFailed(false); return; }
+    try {
+      const s = await api.schema();
+      setTables(s.tables);
+      setFailed(false);
+    } catch (e) {
+      setFailed(true);
+      showError(e);
+    }
+  }, [connected, showError]);
+
+  useEffect(() => { load(); }, [load]);
 
   const { nodes, edges } = useMemo(() => {
     const COLS = 3, W = 300, H = 280;
@@ -63,16 +76,32 @@ export function ErDiagram({ connected }: { connected: boolean }) {
         id: `${tb.name}-${fk.referred_table}-${j}`,
         source: tb.name,
         target: fk.referred_table,
+        type: 'smoothstep',
         label: fk.constrained_columns.join(','),
         animated: true,
-        style: { strokeWidth: 1.5 },
-        labelStyle: { fontSize: 10, fontFamily: 'monospace' },
+        style: { strokeWidth: 1.5, stroke: 'var(--muted-foreground)' },
+        labelStyle: { fontSize: 10, fontFamily: 'monospace', fill: 'var(--foreground)' },
+        labelBgStyle: { fill: 'var(--card)', fillOpacity: 0.95 },
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 6,
       })));
     return { nodes, edges };
   }, [tables, t]);
 
+  if (failed) {
+    return (
+      <Card><CardContent className="space-y-3 py-16 text-center">
+        <p className="text-sm text-destructive">{t('loadFailed')}</p>
+        <Button variant="outline" size="sm" onClick={load}>{t('retry')}</Button>
+      </CardContent></Card>
+    );
+  }
   if (!connected || !tables.length) {
-    return <Card><CardContent className="py-16 text-center text-sm text-muted-foreground">{t('empty')}</CardContent></Card>;
+    return (
+      <Card><CardContent className="py-16 text-center text-sm text-muted-foreground">
+        {connected ? t('noTables') : t('empty')}
+      </CardContent></Card>
+    );
   }
 
   return (

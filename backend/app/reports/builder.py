@@ -3,6 +3,7 @@ import json
 import os
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from ..errors import AppError
 
 _DIR = os.path.dirname(__file__)
 _env = Environment(
@@ -43,11 +44,11 @@ def _chartjs_source() -> str:
 
 def build_report_html(*, title: str, profile: dict, insights: dict, language: str,
                       variant: str, source_name: str, model_label: str,
-                      created_at: str, brand_color: str = "#2a78d6") -> str:
+                      created_at: str, brand_color: str = "#059669") -> str:
     if variant not in ("executive", "detailed", "dashboard"):
-        raise ValueError(f"قالب غير معروف: {variant}")
+        raise AppError("unknownTemplate", template=variant)
     if language not in _STRINGS:
-        raise ValueError(f"لغة غير مدعومة: {language}")
+        raise AppError("unsupportedLanguage", language=language)
     charts = profile.get("charts", [])
     if variant == "executive":
         charts = charts[:3]

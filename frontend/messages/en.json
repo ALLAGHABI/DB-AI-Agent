@@ -2,7 +2,16 @@
   "app": {
     "name": "SmartDB",
     "tagline": "Your data never leaves your machine",
-    "builtBy": "Built by"
+    "builtBy": "Built by",
+    "skipToContent": "Skip to content",
+    "apiDown": "Cannot reach the SmartDB server — make sure it is running",
+    "settingsRegion": "Settings and connection",
+    "switchLanguage": "Switch language",
+    "switchToLight": "Switch to light theme",
+    "switchToDark": "Switch to dark theme",
+    "close": "Close",
+    "metaTitle": "AI Database Manager",
+    "metaDescription": "Local-first AI database management & reporting"
   },
   "status": {
     "connected": "Connected",
@@ -33,7 +42,14 @@
     "rows": "rows",
     "affected": "rows affected",
     "needsSetup": "Connect a database and pick a model to start",
-    "emptyHint": "Results will appear here"
+    "emptyHint": "Results will appear here",
+    "rowCount": "{count, plural, =0 {No rows} one {1 row} other {# rows}}",
+    "affectedCount": "{count, plural, =0 {No rows affected} one {1 row affected} other {# rows affected}}",
+    "step1": "Connect a database from the sidebar",
+    "step2": "Pick an AI model",
+    "example1": "Show top 5 selling products",
+    "example2": "How many customers per city?",
+    "example3": "Monthly sales totals"
   },
   "tables": {
     "pick": "Pick a table",
@@ -43,7 +59,7 @@
     "add": "Add",
     "deleteSelected": "Delete selected",
     "deleteConfirmTitle": "Delete selected rows?",
-    "deleteConfirmBody": "{count} rows will be permanently deleted.",
+    "deleteConfirmBody": "{count, plural, one {1 row will be permanently deleted.} other {# rows will be permanently deleted.}}",
     "editHint": "Double-click any cell to edit — Enter to save, Esc to cancel",
     "saved": "Saved",
     "deleted": "Deleted",
@@ -61,17 +77,28 @@
     "backup": "Backup",
     "noPk": "This table has no primary key — editing disabled",
     "rows": "rows",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "selectAll": "Select all rows",
+    "selectRow": "Select row {n}",
+    "primaryKey": "Primary key",
+    "deletedCount": "Deleted {ok} of {total}",
+    "importFile": "File",
+    "needsConnection": "Connect a database to browse tables",
+    "rowCount": "{count, plural, =0 {No rows} one {1 row} other {# rows}}"
   },
   "er": {
     "empty": "Connect a database to view the schema",
-    "rows": "rows"
+    "rows": "rows",
+    "loadFailed": "Could not load the schema",
+    "retry": "Retry",
+    "noTables": "This database has no tables"
   },
   "sqlEditor": {
     "run": "Run",
     "running": "Running…",
     "placeholder": "-- Write SQL here",
-    "hint": "Modifying queries will ask for confirmation before running"
+    "hint": "Modifying queries will ask for confirmation before running",
+    "needsConnection": "Connect a database first"
   },
   "connections": {
     "title": "Database",
@@ -136,6 +163,48 @@
     "generated": "Report generated",
     "localBadge": "Local",
     "cloudBadge": "Cloud",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "deleted": "Report deleted",
+    "open": "Open report"
+  },
+  "errors": {
+    "generic": "An unexpected error occurred",
+    "network": "Cannot reach the SmartDB server — make sure it is running",
+    "notConnected": "No database connection",
+    "connectFailed": "Connection failed: {detail}",
+    "dbFileMissing": "Database file not found: {path}",
+    "tableMissing": "Table not found: {table}",
+    "unknownSortColumn": "Unknown sort column: {column}",
+    "badSortDirection": "Sort direction must be ascending or descending",
+    "unknownColumns": "Unknown columns: {columns}",
+    "emptyValues": "No values provided",
+    "noPrimaryKey": "This table has no primary key — editing is not supported",
+    "incompletePrimaryKey": "All primary key values must be provided",
+    "insertFailed": "Insert failed: {detail}",
+    "updateFailed": "Update failed: {detail}",
+    "deleteFailed": "Delete failed: {detail}",
+    "executeFailed": "Execution error: {detail}",
+    "sqlParseFailed": "Could not parse the query: {detail}",
+    "singleStatementOnly": "Only one statement is allowed per request",
+    "writeNeedsConfirm": "This query modifies data — explicit confirmation required",
+    "fileTooLarge": "File exceeds the maximum size ({limit})",
+    "unsupportedFormat": "Unsupported format — supported: CSV, Excel, JSON",
+    "badImportMode": "Invalid import mode",
+    "tableExists": "Table already exists: {table} — use append mode",
+    "tableMissingForAppend": "Table not found: {table} — use create mode",
+    "badExportFormat": "Supported export formats: CSV or Excel",
+    "backupSqliteOnly": "Direct backup is currently available for SQLite databases only",
+    "importFailed": "Import failed: {detail}",
+    "fileReadFailed": "Could not read the file: {detail}",
+    "emptyFile": "The file contains no data",
+    "unknownProvider": "Unknown provider: {provider}",
+    "generateFailed": "Query generation failed: {detail}",
+    "insightsFailed": "Insight generation failed: {detail}",
+    "analysisExpired": "Analysis session expired — please upload the file again",
+    "fileMissing": "File not found",
+    "reportMissing": "Report not found",
+    "unknownFileKind": "Unknown file type: {kind}",
+    "unknownTemplate": "Unknown template: {template}",
+    "unsupportedLanguage": "Unsupported language: {language}"
   }
 }

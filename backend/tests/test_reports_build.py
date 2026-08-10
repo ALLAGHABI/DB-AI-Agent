@@ -5,6 +5,7 @@ from app.reports.analyzer import profile_df
 from app.reports.builder import build_report_html
 from app.reports.exporter import to_xlsx
 from app.reports.store import ReportStore
+from app.errors import AppError, NotFoundError
 
 
 @pytest.fixture
@@ -57,8 +58,9 @@ def test_dashboard_variant_hides_findings(profile, insights):
 
 
 def test_invalid_variant_rejected(profile, insights):
-    with pytest.raises(ValueError):
+    with pytest.raises(AppError) as e:
         _build(profile, insights, variant="fancy")
+    assert e.value.code == "unknownTemplate"
 
 
 def test_xlsx_has_sheets_and_magic(profile, insights):
@@ -79,7 +81,7 @@ def test_store_roundtrip(tmp_path, profile, insights):
     metas = store.list()
     assert metas[0]["id"] == rid and metas[0]["pdf"] is False
     assert store.get_file(rid, "html").decode("utf-8") == html
-    with pytest.raises(LookupError):
+    with pytest.raises(NotFoundError):
         store.get_file(rid, "pdf")
     store.delete(rid)
     assert store.list() == []
@@ -91,5 +93,6 @@ def test_temp_token_roundtrip(tmp_path):
     token = store.save_temp(df, "x.csv")
     df2, name = store.load_temp(token)
     assert name == "x.csv" and len(df2) == 2
-    with pytest.raises(LookupError):
+    with pytest.raises(NotFoundError) as e:
         store.load_temp("missing")
+    assert e.value.code == "analysisExpired"

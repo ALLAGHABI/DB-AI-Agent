@@ -2,6 +2,7 @@ from enum import Enum
 
 import sqlglot
 from sqlglot import exp
+from ..errors import AppError
 
 
 class SqlClass(str, Enum):
@@ -18,10 +19,10 @@ def _parse_one(sql: str, dialect: str | None = None) -> exp.Expression:
     try:
         statements = sqlglot.parse(sql, read=dialect)
     except Exception as e:
-        raise ValueError(f"تعذر تحليل الاستعلام: {e}") from e
+        raise AppError("sqlParseFailed", detail=str(e)) from e
     statements = [s for s in statements if s is not None]
     if len(statements) != 1:
-        raise ValueError("يُسمح باستعلام واحد فقط في كل طلب")
+        raise AppError("singleStatementOnly")
     return statements[0]
 
 

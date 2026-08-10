@@ -50,16 +50,27 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [semantics, setSemantics] = useState<Record<string, Semantics>>({});
   const [overrides, setOverrides] = useState<Record<string, SemanticOverride>>({});
+  const [labels, setLabels] = useState<Record<string, string>>({});
+
+  // الأعمدة التي ستظهر فعلاً في التقرير — هي وحدها تستحق إعادة تسمية
+  const usedColumns = Object.entries(semantics).flatMap(([table, sem]) => {
+    const ov = overrides[table] ?? {};
+    const measure = ov.measure ?? sem.measures[0];
+    const date = ov.date ?? sem.dates[0];
+    const dims = ov.dimensions ?? sem.dimensions.slice(0, 3);
+    return [measure, date, ...dims].filter(Boolean) as string[];
+  }).filter((c, i, arr) => arr.indexOf(c) === i);
 
   const analyzeTables = async (names: string[]) => {
     if (!names.length) return;
     setAnalyzing(true);
     setProfile(null); setToken(null);
     try {
-      const res = await api.reportAnalyzeTables(names);
+      const res = await api.reportAnalyzeTables(names, language);
       setToken(res.token);
       setProfile(res.profile);
       setSemantics(res.semantics ?? {});
+      setLabels(res.labels ?? {});
       setOverrides({});
       const label = names.length === 1 ? names[0] : t('allTables');
       setSourceName(label);
@@ -81,10 +92,11 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
     setAnalyzing(true);
     setProfile(null); setToken(null);
     try {
-      const res = await api.reportAnalyze(file);
+      const res = await api.reportAnalyze(file, language);
       setToken(res.token);
       setProfile(res.profile);
       setSemantics(res.semantics ?? {});
+      setLabels(res.labels ?? {});
       setOverrides({});
       setSourceName(file.name);
       if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
@@ -103,6 +115,7 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
         token, title: title || sourceName, template, language,
         provider: selection.provider, model: selection.model,
         overrides: Object.keys(overrides).length ? overrides : undefined,
+        labels: Object.keys(labels).length ? labels : undefined,
       });
       // التوليد المحلي قد يستغرق دقيقة — نستطلع الحالة بدل انتظار طلب طويل يُقطع
       for (;;) {
@@ -333,6 +346,24 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
                       </div>
                     );
                   })}
+
+                  {usedColumns.length > 0 && (
+                    <div className="space-y-1.5 border-t pt-2">
+                      <Label className="text-xs text-muted-foreground">{t('labelsTitle')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('labelsHint')}</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {usedColumns.map(col => (
+                          <div key={col} className="flex items-center gap-2">
+                            <span className="w-28 shrink-0 truncate font-mono text-xs text-muted-foreground"
+                              dir="ltr" title={col}>{col}</span>
+                            <Input dir="auto" className="h-8 text-sm"
+                              value={labels[col] ?? ''}
+                              onChange={e => setLabels(l => ({ ...l, [col]: e.target.value }))} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

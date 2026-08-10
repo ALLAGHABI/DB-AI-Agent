@@ -84,3 +84,20 @@ def test_handles_data_without_dates_or_measures():
 def test_empty_frame_is_safe():
     b = analyze_business(pd.DataFrame({"a": []}))
     assert b["kpis"][0]["value"] == 0 and b["trend"] is None
+
+
+def test_near_unique_columns_are_not_dimensions():
+    """عنوان الشحن مختلف لكل صف — رسم توزيع عليه بلا فائدة."""
+    df = pd.DataFrame({
+        "shipping_address": [f"عنوان {i}" for i in range(40)],
+        "status": ["pending"] * 20 + ["shipped"] * 20,
+        "total_amount": [100.0] * 40,
+    })
+    sem = detect_semantics(df)
+    assert "shipping_address" not in sem["dimensions"]
+    assert "status" in sem["dimensions"]
+
+
+def test_high_cardinality_is_capped():
+    df = pd.DataFrame({"code": [f"c{i % 45}" for i in range(200)]})
+    assert detect_semantics(df)["dimensions"] == []      # 45 فئة > الحد

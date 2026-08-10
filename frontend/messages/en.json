@@ -201,7 +201,9 @@
     "none": "None",
     "smallModelWarn": "This model is small and may weaken report quality — 4b or larger is recommended",
     "droppedWarn": "{count} statements citing numbers absent from your data were removed",
-    "languageWarn": "The model did not honour the requested report language"
+    "languageWarn": "The model did not honour the requested report language",
+    "labelsTitle": "Column names in the report",
+    "labelsHint": "This is how they will appear — rename as you like"
   },
   "errors": {
     "generic": "An unexpected error occurred",

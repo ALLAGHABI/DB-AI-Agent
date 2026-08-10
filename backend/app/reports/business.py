@@ -20,6 +20,8 @@ _DIM_HINTS = ("city", "country", "region", "category", "type", "status", "state"
 
 TOP_N = 8
 MAX_TREND_POINTS = 24
+MAX_DIM_CATEGORIES = 30
+MIN_ROWS_FOR_RATIO = 20
 
 
 def _is_identifier(name: str, series: pd.Series) -> bool:
@@ -49,8 +51,12 @@ def detect_semantics(df: pd.DataFrame) -> dict:
             measures.append((score, name))
             continue
 
+        # تصنيف مفيد = فئات قليلة متكررة؛ عمود شبه فريد (عنوان، ملاحظة) لا يصلح.
+        # نسبة التفرد لا معنى لها على عينة صغيرة، فنطبقها من MIN_ROWS_FOR_RATIO فأكثر.
         unique = s.nunique(dropna=True)
-        if 1 < unique <= max(50, len(s) * 0.5):
+        rows = len(s.dropna())
+        repetitive = rows < MIN_ROWS_FOR_RATIO or unique / rows <= 0.6
+        if 1 < unique <= MAX_DIM_CATEGORIES and repetitive:
             score = 1 if any(h in low for h in _DIM_HINTS) else 0
             dimensions.append((score, unique, name))
 
@@ -174,13 +180,19 @@ def analyze_business(df: pd.DataFrame, overrides: dict | None = None) -> dict:
     }
 
 
-def facts_from_business(business: dict, table: str | None = None) -> list[str]:
-    """قائمة حقائق مرقّمة تُمرَّر للنموذج — لا يُسمح له بأرقام خارجها."""
-    prefix = f"[{table}] " if table else ""
+def facts_from_business(business: dict, table: str | None = None,
+                        labels: dict | None = None) -> list[str]:
+    """قائمة حقائق مرقّمة تُمرَّر للنموذج — لا يُسمح له بأرقام خارجها.
+
+    الأعمدة تُذكر بتسميتها الوصفية حتى يكتب النموذج لغة أعمال لا أسماء جداول.
+    """
+    labels = labels or {}
+    lbl = lambda c: labels.get(c, c)          # noqa: E731
+    prefix = f"[{lbl(table)}] " if table else ""
     facts: list[str] = []
 
     for k in business["kpis"]:
-        col = f" of {k['column']}" if k.get("column") else ""
+        col = f" of {lbl(k['column'])}" if k.get("column") else ""
         facts.append(f"{prefix}{k['key']}{col} = {k['value']}")
 
     tr = business.get("trend")
@@ -193,11 +205,11 @@ def facts_from_business(business: dict, table: str | None = None) -> list[str]:
 
     for b in business.get("breakdowns", []):
         facts.append(
-            f"{prefix}by {b['column']}: {b['categories']} categories, "
+            f"{prefix}by {lbl(b['column'])}: {b['categories']} categories, "
             f"top is '{b['leader']}' = {b['leader_value']}"
             + (f" ({b['leader_share_pct']}% of total)"
                if b["leader_share_pct"] is not None else ""))
         pairs = ", ".join(f"{l}={v}" for l, v in zip(b["labels"][:5], b["values"][:5]))
-        facts.append(f"{prefix}top {b['column']} values: {pairs}")
+        facts.append(f"{prefix}top {lbl(b['column'])} values: {pairs}")
 
     return facts

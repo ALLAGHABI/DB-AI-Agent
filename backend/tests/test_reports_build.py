@@ -97,3 +97,42 @@ def test_temp_token_roundtrip(tmp_path):
     with pytest.raises(NotFoundError) as e:
         store.load_temp("missing")
     assert e.value.code == "analysisExpired"
+
+
+# ---------- التقرير التنفيذي: أرقام أعمال بلا تفاصيل تقنية ----------
+
+@pytest.fixture
+def business_profile():
+    import pandas as pd
+    from app.reports.business import analyze_business
+    df = pd.DataFrame({
+        "order_date": pd.date_range("2025-01-01", periods=60, freq="D"),
+        "city": ["الرياض"] * 40 + ["جدة"] * 20,
+        "total_amount": [500.0] * 40 + [250.0] * 20,
+    })
+    profile = profile_df(df)
+    profile["business"] = {"orders": analyze_business(df)}
+    return profile
+
+
+def test_executive_shows_business_kpis(business_profile, insights):
+    html = _build(business_profile, insights, variant="executive")
+    assert "الإجمالي" in html and "المتوسط" in html      # مؤشرات أعمال
+    assert "25,000" in html                              # 40×500 + 20×250
+    assert "حسب city" in html or "city" in html          # رسم توزيع
+
+
+def test_executive_hides_technical_internals(business_profile, insights):
+    html = _build(business_profile, insights, variant="executive")
+    for technical in ("قيم مفقودة", "صفوف مكررة", "تفاصيل الأعمدة", "عينة من البيانات"):
+        assert technical not in html, technical
+
+
+def test_detailed_keeps_technical_appendix(business_profile, insights):
+    html = _build(business_profile, insights, variant="detailed")
+    assert "قيم مفقودة" in html and "تفاصيل الأعمدة" in html
+
+
+def test_dropped_claims_are_disclosed(business_profile, insights):
+    html = _build(business_profile, {**insights, "dropped_claims": 2})
+    assert "أرقاماً غير موجودة" in html

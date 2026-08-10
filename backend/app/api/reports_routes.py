@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from ..db import transfer
 from ..reports import exporter
 from ..reports.analyzer import MAX_DATASETS, profile_datasets, profile_df
+from ..reports.business import analyze_business, facts_from_business
 from ..reports.builder import build_report_html
 from ..reports.insights import generate_insights
 from ..reports.store import ReportStore
@@ -62,15 +63,18 @@ def analyze_tables(body: AnalyzeTablesIn):
         for fk in t["foreign_keys"] if fk["referred_table"] in frames
     ]
 
+    semantics = {name: analyze_business(df)["semantics"]
+                 for name, df in frames.items() if not df.empty}
+
     if len(frames) == 1:
         name, df = next(iter(frames.items()))
-        profile = profile_df(df)
-        return {"token": _store().save_temp(df, name), "profile": profile}
+        return {"token": _store().save_temp(df, name),
+                "profile": profile_df(df), "semantics": semantics}
 
     profile = profile_datasets(frames, relationships)
     source = state.db.dialect or "database"
     token = _store().save_temp(frames, source, relationships)
-    return {"token": token, "profile": profile}
+    return {"token": token, "profile": profile, "semantics": semantics}
 
 
 @router.post("/analyze")
@@ -86,7 +90,9 @@ async def analyze(file: UploadFile = File(...)):
         raise http_error("emptyFile")
     profile = profile_df(df)
     token = _store().save_temp(df, file.filename or "upload")
-    return {"token": token, "profile": profile}
+    name = file.filename or "upload"
+    return {"token": token, "profile": profile,
+            "semantics": {name: analyze_business(df)["semantics"]}}
 
 
 class GenerateIn(BaseModel):
@@ -96,6 +102,7 @@ class GenerateIn(BaseModel):
     language: str = "ar"
     provider: str
     model: str
+    overrides: dict | None = None        # {table: {measure, date, dimensions}}
 
 
 @router.post("/generate")
@@ -119,9 +126,20 @@ def generate(body: GenerateIn):
         else:
             profile = profile_df(next(iter(frames.values())))
 
+        # أرقام الأعمال الحقيقية — هي وحدها ما يراه النموذج
+        business, facts = {}, []
+        for name, df in frames.items():
+            if df.empty:
+                continue
+            label = name if len(frames) > 1 else None
+            b = analyze_business(df, body.overrides.get(name) if body.overrides else None)
+            business[name] = b
+            facts.extend(facts_from_business(b, label))
+        profile = {**profile, "business": business}
+
         try:
-            insights = asyncio.run(
-                generate_insights(provider, body.model, profile, body.language))
+            insights = asyncio.run(generate_insights(
+                provider, body.model, facts, body.language, subject=source_name))
         except AppError:
             raise
         except Exception as e:
@@ -144,6 +162,8 @@ def generate(body: GenerateIn):
 
         meta = {
             "title": body.title, "template": body.template, "language": body.language,
+            "language_ok": insights.get("language_ok", True),
+            "dropped_claims": insights.get("dropped_claims", 0),
             "source_name": source_name, "model_label": model_label,
             "created_at": created_at, "created_iso": now.isoformat(),
             "is_local": provider.is_local,

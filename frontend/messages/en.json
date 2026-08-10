@@ -192,7 +192,16 @@
     "relationships": "Relationships",
     "totalRows": "Total rows",
     "perTable": "Included tables",
-    "selectedNone": "No table selected"
+    "selectedNone": "No table selected",
+    "analysisBasis": "Analysis basis",
+    "measureCol": "Value column",
+    "dateCol": "Date column",
+    "dimCols": "Categories",
+    "autoDetected": "Auto-detected — adjust if needed",
+    "none": "None",
+    "smallModelWarn": "This model is small and may weaken report quality — 4b or larger is recommended",
+    "droppedWarn": "{count} statements citing numbers absent from your data were removed",
+    "languageWarn": "The model did not honour the requested report language"
   },
   "errors": {
     "generic": "An unexpected error occurred",

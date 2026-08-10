@@ -7,7 +7,10 @@ import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useApiError } from '@/lib/use-api-error';
-import { ApiError, api, type ReportMeta, type ReportProfile } from '@/lib/api';
+import {
+  ApiError, api, type ReportMeta, type ReportProfile,
+  type SemanticOverride, type Semantics,
+} from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +32,8 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
   const locale = useLocale();
   const format = useFormatter();
   const { showError } = useApiError();
+  // النماذج الصغيرة (≤2B) تتجاهل اللغة وتختلق الأرقام — ننبّه قبل التوليد
+  const isSmallModel = /(^|[^\d])(0\.\d|1|1\.\d|2)b\b/i.test(selection?.model ?? '');
   const fileRef = useRef<HTMLInputElement>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -43,6 +48,8 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState('new');
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [semantics, setSemantics] = useState<Record<string, Semantics>>({});
+  const [overrides, setOverrides] = useState<Record<string, SemanticOverride>>({});
 
   const analyzeTables = async (names: string[]) => {
     if (!names.length) return;
@@ -52,6 +59,8 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
       const res = await api.reportAnalyzeTables(names);
       setToken(res.token);
       setProfile(res.profile);
+      setSemantics(res.semantics ?? {});
+      setOverrides({});
       const label = names.length === 1 ? names[0] : t('allTables');
       setSourceName(label);
       setTitle(label);
@@ -75,6 +84,8 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
       const res = await api.reportAnalyze(file);
       setToken(res.token);
       setProfile(res.profile);
+      setSemantics(res.semantics ?? {});
+      setOverrides({});
       setSourceName(file.name);
       if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
     } catch (e) {
@@ -91,6 +102,7 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
       const { job_id } = await api.reportGenerate({
         token, title: title || sourceName, template, language,
         provider: selection.provider, model: selection.model,
+        overrides: Object.keys(overrides).length ? overrides : undefined,
       });
       // التوليد المحلي قد يستغرق دقيقة — نستطلع الحالة بدل انتظار طلب طويل يُقطع
       for (;;) {
@@ -103,6 +115,10 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
         }
         setReports(r => [job.report, ...r]);
         toast.success(t('generated'));
+        if (job.report.dropped_claims) {
+          toast.warning(t('droppedWarn', { count: job.report.dropped_claims }));
+        }
+        if (job.report.language_ok === false) toast.warning(t('languageWarn'));
         setTab('archive');
         return;
       }
@@ -246,6 +262,79 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
                     ))}
                 </div>
               </div>
+
+              {Object.keys(semantics).length > 0 && (
+                <div className="space-y-2 rounded-xl border p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Sparkles className="h-4 w-4 text-primary" aria-hidden />
+                    {t('analysisBasis')}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('autoDetected')}</p>
+                  {Object.entries(semantics).map(([table, sem]) => {
+                    const ov = overrides[table] ?? {};
+                    const measure = ov.measure ?? sem.measures[0] ?? '';
+                    const date = ov.date ?? sem.dates[0] ?? '';
+                    const setOv = (patch: SemanticOverride) =>
+                      setOverrides(o => ({ ...o, [table]: { ...o[table], ...patch } }));
+                    return (
+                      <div key={table} className="flex flex-wrap items-end gap-2">
+                        {Object.keys(semantics).length > 1 && (
+                          <Badge variant="outline" className="font-mono text-xs">{table}</Badge>
+                        )}
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">{t('measureCol')}</Label>
+                          <Select value={measure || '—'}
+                            onValueChange={v => v && setOv({ measure: v === '—' ? null : v })}>
+                            <SelectTrigger className="w-40 font-mono text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="—" className="text-xs">{t('none')}</SelectItem>
+                              {sem.measures.map(m => (
+                                <SelectItem key={m} value={m} className="font-mono text-xs">{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {sem.dates.length > 0 && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">{t('dateCol')}</Label>
+                            <Select value={date || '—'}
+                              onValueChange={v => v && setOv({ date: v === '—' ? null : v })}>
+                              <SelectTrigger className="w-40 font-mono text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="—" className="text-xs">{t('none')}</SelectItem>
+                                {sem.dates.map(d => (
+                                  <SelectItem key={d} value={d} className="font-mono text-xs">{d}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {sem.dimensions.length > 0 && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">{t('dimCols')}</Label>
+                            <div className="flex flex-wrap gap-1">
+                              {sem.dimensions.slice(0, 6).map(d => {
+                                const chosen = ov.dimensions ?? sem.dimensions.slice(0, 3);
+                                const on = chosen.includes(d);
+                                return (
+                                  <button key={d} type="button" aria-pressed={on}
+                                    onClick={() => setOv({ dimensions: on
+                                      ? chosen.filter(x => x !== d) : [...chosen, d] })}
+                                    className={`cursor-pointer rounded-full border px-2.5 py-0.5 font-mono text-xs transition-colors
+                                      ${on ? 'border-primary bg-primary text-primary-foreground'
+                                           : 'text-muted-foreground hover:border-primary'}`}>
+                                    {d}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5 sm:col-span-3">

@@ -18,20 +18,27 @@ class ReportStore:
 
     # ---------- ملفات التحليل المؤقتة (بين خطوتي analyze/generate) ----------
 
-    def save_temp(self, df: pd.DataFrame, source_name: str) -> str:
+    def save_temp(self, frames: "dict[str, pd.DataFrame] | pd.DataFrame",
+                  source_name: str, relationships: list | None = None) -> str:
+        """يقبل إطاراً واحداً أو عدة إطارات معنونة (تقرير قاعدة كاملة)."""
+        if isinstance(frames, pd.DataFrame):
+            frames = {source_name: frames}
+            kind = "single"
+        else:
+            kind = "multi"
         token = uuid.uuid4().hex
         with open(os.path.join(self.tmp, f"{token}.pkl"), "wb") as f:
-            pickle.dump({"df": df, "source_name": source_name, "ts": time.time()}, f)
+            pickle.dump({"frames": frames, "kind": kind, "source_name": source_name,
+                         "relationships": relationships or [], "ts": time.time()}, f)
         self._cleanup_temp()
         return token
 
-    def load_temp(self, token: str) -> tuple[pd.DataFrame, str]:
+    def load_temp(self, token: str) -> dict:
         path = os.path.join(self.tmp, f"{os.path.basename(token)}.pkl")
         if not os.path.exists(path):
             raise NotFoundError("analysisExpired")
         with open(path, "rb") as f:
-            data = pickle.load(f)
-        return data["df"], data["source_name"]
+            return pickle.load(f)
 
     def _cleanup_temp(self, ttl: float = 3600):
         now = time.time()

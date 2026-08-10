@@ -20,6 +20,7 @@ _STRINGS = {
         "charts": "الرسوم البيانية", "recommendations": "التوصيات",
         "columns": "تفاصيل الأعمدة", "sample": "عينة من البيانات",
         "nulls": "فارغ", "unique": "فريد", "mean": "المتوسط",
+        "tables": "عدد الجداول", "relationships": "العلاقات", "table": "جدول",
         "range": "المدى", "outliers": "شواذ",
         "footer": "تقرير مولّد محلياً — بياناتك لم تغادر جهازك",
     },
@@ -31,6 +32,7 @@ _STRINGS = {
         "charts": "Charts", "recommendations": "Recommendations",
         "columns": "Column Details", "sample": "Data Sample",
         "nulls": "nulls", "unique": "unique", "mean": "mean",
+        "tables": "Tables", "relationships": "Relationships", "table": "Table",
         "range": "range", "outliers": "outliers",
         "footer": "Generated locally — your data never left your machine",
     },
@@ -49,10 +51,22 @@ def build_report_html(*, title: str, profile: dict, insights: dict, language: st
         raise AppError("unknownTemplate", template=variant)
     if language not in _STRINGS:
         raise AppError("unsupportedLanguage", language=language)
-    charts = profile.get("charts", [])
-    if variant == "executive":
-        charts = charts[:3]
-    profile = {**profile, "charts": charts}
+    if profile.get("kind") == "multi":
+        # كل جدول يحمل رسومه؛ نجمعها بمعرفات فريدة للوحة الرسم
+        datasets = profile["datasets"]
+        if variant == "executive":
+            datasets = [{**d, "profile": {**d["profile"],
+                                          "charts": d["profile"]["charts"][:1]}}
+                        for d in datasets]
+        profile = {**profile, "datasets": datasets}
+        charts = [{**c, "id": f"chart-{d['name']}-{i + 1}"}
+                  for d in datasets for i, c in enumerate(d["profile"]["charts"])]
+    else:
+        charts = profile.get("charts", [])
+        if variant == "executive":
+            charts = charts[:3]
+        profile = {**profile, "charts": charts}
+        charts = [{**c, "id": f"chart-{i + 1}"} for i, c in enumerate(charts)]
     template = _env.get_template("report.html.j2")
     return template.render(
         title=title, profile=profile, insights=insights, language=language,

@@ -19,8 +19,21 @@ def _style_header(ws):
         ws.column_dimensions[get_column_letter(i)].width = min(max(width + 4, 12), 50)
 
 
+def _sheet_name(name: str, used: set) -> str:
+    """أسماء أوراق Excel محدودة بـ31 حرفاً ويجب أن تكون فريدة."""
+    base = str(name)[:28] or "sheet"
+    candidate, i = base, 1
+    while candidate in used:
+        candidate = f"{base[:26]}_{i}"
+        i += 1
+    used.add(candidate)
+    return candidate
+
+
 def to_xlsx(profile: dict, insights: dict, language: str) -> bytes:
     ar = language == "ar"
+    if profile.get("kind") == "multi":
+        return _to_xlsx_multi(profile, insights, ar)
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         # ورقة الملخص
@@ -47,6 +60,43 @@ def to_xlsx(profile: dict, insights: dict, language: str) -> bytes:
         # ورقة العينة
         pd.DataFrame(profile["sample"], columns=profile["sample_columns"]) \
             .to_excel(writer, sheet_name="عينة" if ar else "Sample", index=False)
+
+        for ws in writer.book.worksheets:
+            _style_header(ws)
+            if ar:
+                ws.sheet_view.rightToLeft = True
+    return buf.getvalue()
+
+
+def _to_xlsx_multi(profile: dict, insights: dict, ar: bool) -> bytes:
+    buf = io.BytesIO()
+    used: set = set()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        rows = [
+            ("عدد الجداول" if ar else "Tables", profile["overview"]["tables"]),
+            ("إجمالي الصفوف" if ar else "Total rows", profile["overview"]["rows"]),
+            ("إجمالي الأعمدة" if ar else "Total columns", profile["overview"]["cols"]),
+            ("العلاقات" if ar else "Relationships", profile["overview"]["relationships"]),
+            ("", ""),
+            ("الملخص" if ar else "Summary", insights.get("summary", "")),
+        ]
+        for i, f in enumerate(insights.get("findings", []), 1):
+            rows.append((f"{'نتيجة' if ar else 'Finding'} {i}", f))
+        for i, r in enumerate(insights.get("recommendations", []), 1):
+            rows.append((f"{'توصية' if ar else 'Recommendation'} {i}", r))
+        pd.DataFrame(rows, columns=["البند" if ar else "Item", "القيمة" if ar else "Value"]) \
+            .to_excel(writer, sheet_name=_sheet_name("ملخص" if ar else "Summary", used),
+                      index=False)
+
+        if profile["relationships"]:
+            pd.DataFrame(profile["relationships"]).to_excel(
+                writer, sheet_name=_sheet_name("العلاقات" if ar else "Relationships", used),
+                index=False)
+
+        for ds in profile["datasets"]:
+            df = pd.DataFrame(ds["profile"]["columns"]).drop(
+                columns=["top_values"], errors="ignore")
+            df.to_excel(writer, sheet_name=_sheet_name(ds["name"], used), index=False)
 
         for ws in writer.book.worksheets:
             _style_header(ws)

@@ -85,10 +85,17 @@ footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
 
   <section>
     <div class="tiles">
+      {% if profile.kind == 'multi' %}
+      <div class="tile"><div class="v">{{ profile.overview.tables }}</div><div class="l">{{ t.tables }}</div></div>
+      <div class="tile"><div class="v">{{ "{:,}".format(profile.overview.rows) }}</div><div class="l">{{ t.rows }}</div></div>
+      <div class="tile"><div class="v">{{ profile.overview.cols }}</div><div class="l">{{ t.cols }}</div></div>
+      <div class="tile"><div class="v">{{ profile.overview.relationships }}</div><div class="l">{{ t.relationships }}</div></div>
+      {% else %}
       <div class="tile"><div class="v">{{ "{:,}".format(profile.overview.rows) }}</div><div class="l">{{ t.rows }}</div></div>
       <div class="tile"><div class="v">{{ profile.overview.cols }}</div><div class="l">{{ t.cols }}</div></div>
       <div class="tile"><div class="v">{{ profile.overview.missing_pct }}%</div><div class="l">{{ t.missing }}</div></div>
       <div class="tile"><div class="v">{{ profile.overview.duplicate_rows }}</div><div class="l">{{ t.duplicates }}</div></div>
+      {% endif %}
     </div>
   </section>
 
@@ -104,7 +111,51 @@ footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
   </ul>
   {% endif %}
 
-  {% if profile.charts %}
+  {% if profile.kind == 'multi' %}
+    {% if profile.relationships %}
+    <h2>{{ t.relationships }}</h2>
+    <div class="cols">
+      {% for rel in profile.relationships %}
+      <div class="col-card"><span class="name" dir="ltr">{{ rel.from }} → {{ rel.to }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% for ds in profile.datasets %}
+    <h2>{{ t.table }}: {{ ds.name }}</h2>
+    <div class="tiles">
+      <div class="tile"><div class="v">{{ "{:,}".format(ds.profile.overview.rows) }}</div><div class="l">{{ t.rows }}</div></div>
+      <div class="tile"><div class="v">{{ ds.profile.overview.cols }}</div><div class="l">{{ t.cols }}</div></div>
+      <div class="tile"><div class="v">{{ ds.profile.overview.missing_pct }}%</div><div class="l">{{ t.missing }}</div></div>
+      <div class="tile"><div class="v">{{ ds.profile.overview.duplicate_rows }}</div><div class="l">{{ t.duplicates }}</div></div>
+    </div>
+    {% if ds.profile.charts %}
+    <div class="charts" style="margin-top:14px">
+      {% for c in ds.profile.charts %}
+      <div class="chart-card">
+        <h3>{{ c.title }}</h3>
+        <div class="cwrap"><canvas id="chart-{{ ds.name }}-{{ loop.index }}"></canvas></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if variant == 'detailed' %}
+    <div class="cols" style="margin-top:12px">
+      {% for col in ds.profile.columns %}
+      <div class="col-card">
+        <span class="name">{{ col.name }}</span> <span class="kind">{{ col.kind }}</span>
+        <dl>
+          <dt>{{ t.nulls }}</dt><dd>{{ col.nulls }}</dd>
+          <dt>{{ t.unique }}</dt><dd>{{ col.unique }}</dd>
+        </dl>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  {% if profile.kind != 'multi' and profile.charts %}
   <h2>{{ t.charts }}</h2>
   <div class="charts">
     {% for c in profile.charts %}
@@ -123,7 +174,7 @@ footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
   </ul>
   {% endif %}
 
-  {% if variant == 'detailed' %}
+  {% if variant == 'detailed' and profile.kind != 'multi' %}
   <h2>{{ t.columns }}</h2>
   <div class="cols">
     {% for col in profile.columns %}
@@ -170,8 +221,8 @@ const INK2 = getComputedStyle(document.documentElement).getPropertyValue('--ink-
 const LINE = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
 Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 Chart.defaults.color = INK2;
-CHARTS.forEach((c, i) => {
-  const ctx = document.getElementById('chart-' + (i + 1));
+CHARTS.forEach((c) => {
+  const ctx = document.getElementById(c.id);
   if (!ctx) return;
   const common = {
     responsive: true, maintainAspectRatio: false,

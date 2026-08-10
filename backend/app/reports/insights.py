@@ -24,12 +24,25 @@ no extra sections; write the content itself in {language}."""
 
 def build_insights_prompt(profile: dict, language: str) -> tuple[str, str]:
     system = SYSTEM_TEMPLATE.format(language=_LANG.get(language, "English"))
-    slim = {
-        "overview": profile["overview"],
-        "columns": profile["columns"],
-        "correlations": profile["correlations"],
-        "chart_titles": [c["title"] for c in profile.get("charts", [])],
-    }
+    if profile.get("kind") == "multi":
+        slim = {
+            "database_overview": profile["overview"],
+            "relationships": profile["relationships"],
+            "tables": [
+                {"name": d["name"],
+                 "overview": d["profile"]["overview"],
+                 "columns": [{k: c[k] for k in ("name", "kind", "nulls", "unique") if k in c}
+                             for c in d["profile"]["columns"]]}
+                for d in profile["datasets"]
+            ],
+        }
+    else:
+        slim = {
+            "overview": profile["overview"],
+            "columns": profile["columns"],
+            "correlations": profile["correlations"],
+            "chart_titles": [c["title"] for c in profile.get("charts", [])],
+        }
     user = "Dataset profile:\n" + json.dumps(slim, ensure_ascii=False, default=str)
     return system, user
 

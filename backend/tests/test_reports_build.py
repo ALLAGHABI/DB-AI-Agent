@@ -91,8 +91,9 @@ def test_temp_token_roundtrip(tmp_path):
     store = ReportStore(str(tmp_path))
     df = pd.DataFrame({"a": [1, 2]})
     token = store.save_temp(df, "x.csv")
-    df2, name = store.load_temp(token)
-    assert name == "x.csv" and len(df2) == 2
+    saved = store.load_temp(token)
+    assert saved["source_name"] == "x.csv" and saved["kind"] == "single"
+    assert len(next(iter(saved["frames"].values()))) == 2
     with pytest.raises(NotFoundError) as e:
         store.load_temp("missing")
     assert e.value.code == "analysisExpired"

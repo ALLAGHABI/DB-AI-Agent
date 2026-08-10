@@ -102,17 +102,91 @@ def test_analyze_table_directly(client, tmp_path):
     con.commit(); con.close()
     client.post("/api/db/connect", json={"url": f"sqlite:///{db}"})
 
-    r = client.post("/api/reports/analyze-table", json={"table": "sales"})
+    r = client.post("/api/reports/analyze-table", json={"tables": ["sales"]})
     assert r.status_code == 200
     body = r.json()
     assert body["token"]
     assert body["profile"]["overview"]["rows"] == 3
 
     # جدول غير موجود يعطي رمز خطأ
-    r = client.post("/api/reports/analyze-table", json={"table": "nope"})
+    r = client.post("/api/reports/analyze-table", json={"tables": ["nope"]})
     assert r.status_code == 404 and r.json()["detail"]["code"] == "tableMissing"
 
 
 def test_analyze_table_requires_connection(client):
-    r = client.post("/api/reports/analyze-table", json={"table": "x"})
+    r = client.post("/api/reports/analyze-table", json={"tables": ["x"]})
     assert r.status_code == 400 and r.json()["detail"]["code"] == "notConnected"
+
+
+@respx.mock
+def test_analyze_whole_database_multi_report(client, tmp_path):
+    """قاعدة كاملة: عدة جداول + علاقات في تقرير واحد."""
+    import sqlite3
+    db = tmp_path / "shop.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+        CREATE TABLE cities (id INTEGER PRIMARY KEY, name TEXT);
+        CREATE TABLE sales (id INTEGER PRIMARY KEY, amount REAL,
+                            city_id INTEGER REFERENCES cities(id));
+        INSERT INTO cities (name) VALUES ('الرياض'), ('جدة');
+        INSERT INTO sales (amount, city_id) VALUES (100, 1), (250, 2), (75, 1);
+    """)
+    con.commit(); con.close()
+    client.post("/api/db/connect", json={"url": f"sqlite:///{db}"})
+
+    # جداول فارغة القائمة = القاعدة كاملة
+    r = client.post("/api/reports/analyze-table", json={"tables": []})
+    assert r.status_code == 200
+    profile = r.json()["profile"]
+    assert profile["kind"] == "multi"
+    assert profile["overview"]["tables"] == 2
+    assert profile["overview"]["rows"] == 5          # 2 مدن + 3 مبيعات
+    assert profile["overview"]["relationships"] == 1
+    names = {d["name"] for d in profile["datasets"]}
+    assert names == {"cities", "sales"}
+
+    # توليد تقرير مركّب فعلي
+    respx.get("http://localhost:11434/api/tags").mock(
+        return_value=Response(200, json={"models": [{"name": "gemma3:4b"}]}))
+    respx.post("http://localhost:11434/api/chat").mock(
+        return_value=Response(200, json={"message": {"content": FAKE_INSIGHTS}}))
+    r = client.post("/api/reports/generate", json={
+        "token": r.json()["token"], "title": "تقرير القاعدة", "template": "detailed",
+        "language": "ar", "provider": "ollama", "model": "gemma3:4b"})
+    assert r.status_code == 200, r.text
+    meta = r.json()
+
+    html = client.get(f"/api/reports/{meta['id']}/html").text
+    assert "cities" in html and "sales" in html          # قسم لكل جدول
+    assert "العلاقات" in html                             # قسم العلاقات
+    assert "chart-sales-1" in html or "chart-cities-1" in html
+
+    import io
+
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/reports/{meta['id']}/xlsx").content))
+    assert "cities" in wb.sheetnames and "sales" in wb.sheetnames
+
+
+def test_analyze_subset_of_tables(client, tmp_path):
+    import sqlite3
+    db = tmp_path / "s.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE a (id INTEGER PRIMARY KEY, v REAL);"
+        "CREATE TABLE b (id INTEGER PRIMARY KEY, v REAL);"
+        "CREATE TABLE c (id INTEGER PRIMARY KEY, v REAL);"
+        "INSERT INTO a (v) VALUES (1),(2); INSERT INTO b (v) VALUES (3);"
+        "INSERT INTO c (v) VALUES (4);")
+    con.commit(); con.close()
+    client.post("/api/db/connect", json={"url": f"sqlite:///{db}"})
+
+    profile = client.post("/api/reports/analyze-table",
+                          json={"tables": ["a", "b"]}).json()["profile"]
+    assert profile["kind"] == "multi"
+    assert {d["name"] for d in profile["datasets"]} == {"a", "b"}
+
+    # جدول واحد يبقى تقريراً مفرداً كامل التفاصيل
+    single = client.post("/api/reports/analyze-table",
+                         json={"tables": ["a"]}).json()["profile"]
+    assert single["kind"] == "single" and single["overview"]["rows"] == 2

@@ -179,9 +179,20 @@
     "open": "Open report",
     "newTab": "New report",
     "archiveTab": "Archive",
-    "fromTable": "Or analyze a table from a connected database",
+    "fromTable": "Or analyze from a connected database",
     "pickTable": "Pick a table",
-    "analyzeTable": "Analyze"
+    "analyzeTable": "Analyze",
+    "pickTables": "Pick the tables to analyze",
+    "allTables": "Whole database",
+    "selectAll": "Select all",
+    "clearSel": "Clear",
+    "analyzeSelected": "Analyze selected ({count})",
+    "analyzeAll": "Analyze whole database",
+    "tablesCount": "Tables",
+    "relationships": "Relationships",
+    "totalRows": "Total rows",
+    "perTable": "Included tables",
+    "selectedNone": "No table selected"
   },
   "errors": {
     "generic": "An unexpected error occurred",

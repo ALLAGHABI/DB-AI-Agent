@@ -146,10 +146,41 @@ def profile_df(df: pd.DataFrame, max_charts: int = 6) -> dict:
                     correlations.append({"a": str(a), "b": str(b), "r": round(float(r), 3)})
 
     return {
+        "kind": "single",
         "overview": overview,
         "columns": columns,
         "correlations": correlations,
         "charts": _charts(df, columns, max_charts),
         "sample": [[_py(v) for v in row] for row in df.head(10).values],
         "sample_columns": [str(c) for c in df.columns],
+    }
+
+
+MAX_DATASETS = 20
+
+
+def profile_datasets(frames: dict, relationships: list[dict] | None = None,
+                     max_charts_each: int = 3) -> dict:
+    """ملف إحصائي مركّب لعدة جداول — تقرير قاعدة بيانات كاملة أو جزء منها."""
+    datasets = []
+    for name, df in list(frames.items())[:MAX_DATASETS]:
+        datasets.append({"name": str(name), "profile": profile_df(df, max_charts_each)})
+
+    total_rows = sum(d["profile"]["overview"]["rows"] for d in datasets)
+    total_cols = sum(d["profile"]["overview"]["cols"] for d in datasets)
+    weighted_missing = (
+        sum(d["profile"]["overview"]["missing_pct"] * d["profile"]["overview"]["rows"]
+            for d in datasets) / total_rows if total_rows else 0.0
+    )
+    return {
+        "kind": "multi",
+        "overview": {
+            "tables": len(datasets),
+            "rows": total_rows,
+            "cols": total_cols,
+            "missing_pct": round(weighted_missing, 2),
+            "relationships": len(relationships or []),
+        },
+        "datasets": datasets,
+        "relationships": relationships or [],
     }

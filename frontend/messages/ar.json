@@ -179,9 +179,20 @@
     "open": "افتح التقرير",
     "newTab": "تقرير جديد",
     "archiveTab": "الأرشيف",
-    "fromTable": "أو حلّل جدولاً من قاعدة بيانات متصلة",
+    "fromTable": "أو حلّل من قاعدة بيانات متصلة",
     "pickTable": "اختر جدولاً",
-    "analyzeTable": "حلّل"
+    "analyzeTable": "حلّل",
+    "pickTables": "اختر الجداول المراد تحليلها",
+    "allTables": "القاعدة كاملة",
+    "selectAll": "تحديد الكل",
+    "clearSel": "إلغاء التحديد",
+    "analyzeSelected": "حلّل المحدد ({count})",
+    "analyzeAll": "حلّل القاعدة كاملة",
+    "tablesCount": "الجداول",
+    "relationships": "العلاقات",
+    "totalRows": "إجمالي الصفوف",
+    "perTable": "الجداول المشمولة",
+    "selectedNone": "لم تحدد أي جدول"
   },
   "errors": {
     "generic": "حدث خطأ غير متوقع",

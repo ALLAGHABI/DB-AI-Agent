@@ -99,7 +99,12 @@
     "saved": "تم الحفظ",
     "model": "النموذج",
     "ollamaMissing": "Ollama غير مشغّل — حمّله من ollama.com ثم: ollama pull gemma3",
-    "refresh": "تحديث"
+    "refresh": "تحديث",
+    "providerNames": {
+      "ollama": "Ollama (محلي)",
+      "openai_compat": "خادم محلي متوافق OpenAI",
+      "openrouter": "OpenRouter (سحابي)"
+    }
   },
   "reports": {
     "title": "استوديو التقارير",

@@ -67,6 +67,15 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
 
   const current = providers.find(p => p.id === selected?.provider);
 
+  // التسمية تأتي من ملفات الترجمة لا من الباكند (حتى تتبدل مع اللغة)
+  const providerLabel = (p: ProviderStatus) => {
+    try {
+      return t(`providerNames.${p.id}`);
+    } catch {
+      return p.label;
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -91,7 +100,7 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
                   ${!p.available ? 'opacity-50' : ''}`}>
                 <span className="flex items-center gap-2">
                   {p.is_local ? <Cpu className="h-3.5 w-3.5 text-primary" /> : <Cloud className="h-3.5 w-3.5" />}
-                  {p.label}
+                  {providerLabel(p)}
                 </span>
                 <span className={`h-2 w-2 rounded-full ${p.available ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
               </button>

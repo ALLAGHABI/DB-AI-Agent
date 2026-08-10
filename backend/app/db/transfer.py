@@ -41,7 +41,7 @@ def _clean_header(name) -> str:
     «وحدة القياس» — وإلا ظهر الاسم مبتوراً أو مشوّهاً في كل عنوان بالتقرير.
     """
     text = re.sub(r"\s+", " ", str(name)).strip()
-    return _DANGLING_AL.sub("ال", text)      # «في ال ساعة» ⇒ «في الساعة»
+    return _DANGLING_AL.sub("ال", text)      # «في ال شهر» ⇒ «في الشهر»
 
 
 def _clean_frame(df: pd.DataFrame) -> pd.DataFrame:

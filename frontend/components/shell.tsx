@@ -28,8 +28,9 @@ const AUTHOR = {
   linkedin: 'https://www.linkedin.com/in/aliallaghabi/',
 };
 
-export function Shell({ sidebar, main, connected, apiDown = false }: {
-  sidebar: React.ReactNode; main: React.ReactNode; connected: boolean; apiDown?: boolean;
+export function Shell({ sidebar, main, connected, apiDown = false, modeSwitch, showStatus = true }: {
+  sidebar: React.ReactNode; main: React.ReactNode; connected: boolean;
+  apiDown?: boolean; modeSwitch?: React.ReactNode; showStatus?: boolean;
 }) {
   const t = useTranslations('app');
   const ts = useTranslations('status');
@@ -41,20 +42,23 @@ export function Shell({ sidebar, main, connected, apiDown = false }: {
       </a>
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
               <Database className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-sm font-bold leading-tight">{t('name')}</h1>
-              <p className="text-xs text-muted-foreground leading-tight">{t('tagline')}</p>
+              <p className="hidden text-xs text-muted-foreground leading-tight sm:block">{t('tagline')}</p>
             </div>
           </div>
+          {modeSwitch}
           <div className="flex items-center gap-3">
-            <Badge variant={connected ? 'default' : 'secondary'} className="gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-primary-foreground' : 'bg-muted-foreground'}`} />
-              {connected ? ts('connected') : ts('disconnected')}
-            </Badge>
+            {showStatus && (
+              <Badge variant={connected ? 'default' : 'secondary'} className="gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-primary-foreground' : 'bg-muted-foreground'}`} />
+                {connected ? ts('connected') : ts('disconnected')}
+              </Badge>
+            )}
             <LangThemeToggles />
           </div>
         </div>

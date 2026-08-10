@@ -176,7 +176,12 @@
     "cloudBadge": "Cloud",
     "cancel": "Cancel",
     "deleted": "Report deleted",
-    "open": "Open report"
+    "open": "Open report",
+    "newTab": "New report",
+    "archiveTab": "Archive",
+    "fromTable": "Or analyze a table from a connected database",
+    "pickTable": "Pick a table",
+    "analyzeTable": "Analyze"
   },
   "errors": {
     "generic": "An unexpected error occurred",
@@ -239,5 +244,10 @@
     "line": "Line",
     "needsNumeric": "Charting needs at least one numeric column",
     "limited": "Showing first {max} rows"
+  },
+  "modes": {
+    "label": "Workspace",
+    "database": "Databases",
+    "reports": "Reports"
   }
 }

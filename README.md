@@ -29,6 +29,16 @@ explicit, clearly-labeled opt-in.
 SmartDB مبني على مبدأ **المحلية أولاً**: يكتشف Ollama تلقائياً ويعرض نماذجك المثبتة،
 وكل ميزات الذكاء تعمل على جهازك. السحابة خيار ثانٍ صريح ومُعلَّم بوضوح.
 
+## 🧭 Two workspaces, one app · أداتان في منتج واحد
+
+SmartDB opens in one of two modes, switchable from the header — **Databases** (query, browse,
+edit, diagram) and **Reports** (upload a file, get an AI-written analytics report). Reports mode
+needs no database connection at all, so analysts never see database plumbing. Your last mode is
+remembered, and `?mode=reports` links straight to it.
+
+يفتح SmartDB على أحد وضعين تبدّل بينهما من الأعلى: **قواعد البيانات** و**التقارير**.
+وضع التقارير لا يحتاج اتصالاً بقاعدة بيانات إطلاقاً — من يريد التحليل فقط لا يرى أي تعقيد.
+
 ## 🎬 Features · الميزات
 
 ### 🗣️ Natural language → SQL · الاستعلام باللغة الطبيعية

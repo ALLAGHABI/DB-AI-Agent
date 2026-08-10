@@ -113,11 +113,12 @@ export const api = {
     const fd = new FormData();
     fd.append('file', file);
     return request('/api/reports/analyze', { method: 'POST', body: fd })
-      .then(r => j<{ token: string; profile: ReportProfile }>(r));
+      .then(r => j<AnalyzeResult>(r));
   },
   reportGenerate: (body: {
     token: string; title: string; template: string; language: string;
     provider: string; model: string;
+    overrides?: Record<string, SemanticOverride>;
   }) => post('/api/reports/generate', body).then(r => j<{ job_id: string; status: string }>(r)),
   reportJob: (jobId: string) =>
     request(`/api/reports/jobs/${jobId}`).then(r => j<ReportJob>(r)),
@@ -127,7 +128,7 @@ export const api = {
   reportFileUrl: (id: string, kind: 'html' | 'pdf' | 'xlsx') => `/api/reports/${id}/${kind}`,
   reportAnalyzeTables: (tables: string[]) =>
     post('/api/reports/analyze-table', { tables })
-      .then(r => j<{ token: string; profile: ReportProfile }>(r)),
+      .then(r => j<AnalyzeResult>(r)),
 
   historyList: (favoritesOnly = false, limit = 50) =>
     request(`/api/history?limit=${limit}&favorites_only=${favoritesOnly}`)
@@ -151,6 +152,12 @@ export const api = {
   connectionUse: (id: string) =>
     post(`/api/connections/${id}/connect`, {})
       .then(r => j<{ success: boolean; dialect: string; tables: string[] }>(r)),
+};
+
+export type Semantics = { measures: string[]; dates: string[]; dimensions: string[] };
+export type SemanticOverride = { measure?: string | null; date?: string | null; dimensions?: string[] };
+export type AnalyzeResult = {
+  token: string; profile: ReportProfile; semantics?: Record<string, Semantics>;
 };
 
 export type ReportJob =
@@ -186,4 +193,5 @@ export type ReportMeta = {
   id: string; title: string; template: string; language: string;
   source_name: string; model_label: string; created_at: string; created_iso?: string;
   is_local: boolean; rows: number; cols: number; pdf: boolean;
+  language_ok?: boolean; dropped_claims?: number;
 };

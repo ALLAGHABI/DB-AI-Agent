@@ -280,6 +280,38 @@ def _requested_charts(business: dict, requested: list[dict], strings: dict,
     return out
 
 
+GRID = 12
+
+
+def _size(chart: dict) -> tuple[int, str]:
+    """حجم البطاقة يتبع كمية بياناتها: دائري صغير مضغوط، وأعمدة كثيرة تحتاج مساحة."""
+    if chart.get("hero"):
+        return 8, "hero"
+    n = len(chart.get("labels") or [])
+    if chart["type"] == "doughnut":
+        return 4, "short" if n <= 4 else ""
+    if chart["type"] == "hbar":
+        if n <= 5:
+            return 4, "short"
+        if n <= 9:
+            return 4, ""
+        return 6, "tall"                 # 10 أشرطة فأكثر تحتاج عرضاً وارتفاعاً
+    return (4, "") if n <= 8 else (6, "")
+
+
+def _pack(charts: list[dict], first_row_used: int) -> None:
+    """يوزّع البطاقات على صفوف مكتملة — الفراغ في آخر الصف يذهب لآخر بطاقة فيه."""
+    row, start = first_row_used, 0
+    for i, c in enumerate(charts):
+        if row + c["slot"] > GRID:
+            if row < GRID and i > start:
+                charts[i - 1]["slot"] += GRID - row      # وسّع الأخيرة لتملأ الصف
+            row, start = 0, i
+        row += c["slot"]
+    if row < GRID and charts:
+        charts[-1]["slot"] += GRID - row
+
+
 def chart_plan(business: dict, variant: str, language: str, labels: dict | None = None,
                requested: list[dict] | None = None) -> list[dict]:
     strings = _STRINGS[language]
@@ -287,8 +319,16 @@ def chart_plan(business: dict, variant: str, language: str, labels: dict | None 
     charts = (_requested_charts(business, requested, strings, labels)
               if requested is not None
               else _auto_charts(business, variant, strings, labels))
+    # رسم رئيسي واحد فقط؛ القالب يعرض الأول، فبقية الاتجاهات تصير بطاقات عادية
+    seen_hero = False
     for i, c in enumerate(charts, 1):
         c["id"] = f"ch-{i}"
+        if c.get("hero"):
+            c["hero"] = not seen_hero
+            seen_hero = True
+        c["slot"], c["size"] = _size(c)
+        if c["kind"] == "trend" and not c["hero"]:
+            c["slot"] = 6                       # اتجاه ثانوي يحتاج عرضاً لا مربعاً
     return charts
 
 
@@ -425,6 +465,10 @@ def build_report_html(*, title: str, profile: dict, insights: dict, language: st
     period = trend["period"] if trend else None
     concentration = (_concentration(business, strings, labels)
                      if variant != "detailed" and "charts" in active else None)
+
+    # الرسم الرئيسي وشريط النتائج في كتلة مستقلة؛ باقي البطاقات تُرصّ لتملأ صفوفها
+    if variant == "dashboard":
+        _pack([c for c in plan if not c.get("hero")], 4 if concentration else 0)
 
     # عدّاد التركّز لوحة رسم مستقلة عن بطاقات الرسوم — يُضاف للسكربت فقط
     canvases = list(plan)

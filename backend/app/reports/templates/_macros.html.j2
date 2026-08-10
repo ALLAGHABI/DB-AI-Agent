@@ -24,9 +24,9 @@
 {%- endmacro %}
 
 {% macro chart_card(c, hero=false) -%}
-<div class="card chart-card"{% if c.slot %} style="grid-column: span {{ c.slot }}"{% endif %}>
+<div class="card chart-card"{% if c.slot %} style="--span: {{ c.slot }}"{% endif %}>
   <h3>{% if c.band %}{{ c.band }} · {% endif %}{{ c.heading }}</h3>
-  <div class="cwrap{% if hero %} hero{% endif %}"><canvas id="{{ c.id }}"></canvas></div>
+  <div class="cwrap {{ 'hero' if hero else c.size or '' }}"><canvas id="{{ c.id }}"></canvas></div>
 </div>
 {%- endmacro %}
 

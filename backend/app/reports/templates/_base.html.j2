@@ -65,8 +65,16 @@ h3 { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
   padding: 16px; box-shadow: 0 1px 2px rgb(15 23 42 / .05);
 }
 .chart-card h3 { margin-bottom: 10px; }
-.cwrap { position: relative; height: 220px; }
+/* لوحة الرسم تُحسب بالبكسل عند العرض؛ إن تغيّر التخطيط بعده (الطباعة مثلاً)
+   احتفظت بمقاسها القديم وخرجت فوق ما جاورها — فنحبسها داخل إطارها. */
+.cwrap { position: relative; height: 220px; overflow: hidden; }
+.cwrap > canvas {
+  position: absolute; inset: 0;
+  width: 100% !important; height: 100% !important;
+}
 .cwrap.hero { height: 290px; }
+.cwrap.tall { height: 300px; }
+.cwrap.short { height: 190px; }
 .chart-note { font-size: 11.5px; color: var(--ink-3); margin-top: 8px; }
 
 /* ——— بطاقة التركّز ——— */
@@ -159,6 +167,10 @@ const AXES = {
 const BASE = { responsive: true, maintainAspectRatio: false,
   plugins: { legend: { display: false }, tooltip: { rtl: RTL } } };
 
+// نحتفظ بالمخططات ليتمكن مُصدِّر PDF من إعادة رسمها بعد تبديل تنسيق الطباعة
+window.__charts = [];
+const keep = (chart) => { window.__charts.push(chart); return chart; };
+
 CHARTS.forEach((c) => {
   const el = document.getElementById(c.id);
   if (!el) return;
@@ -166,26 +178,26 @@ CHARTS.forEach((c) => {
   if (c.type === 'line_area') {
     const pointRadius = c.labels.map((_, i) => (i === c.peak_index ? 5 : (c.labels.length <= 8 ? 3 : 0)));
     const pointColor = c.labels.map((_, i) => (i === c.peak_index ? '#d97706' : BRAND));
-    new Chart(el, { type: 'line', data: { labels, datasets: [{
+    keep(new Chart(el, { type: 'line', data: { labels, datasets: [{
       data: c.values, borderColor: BRAND, borderWidth: 2.2, tension: 0.32,
       fill: true, backgroundColor: gradient(el.getContext('2d'), BRAND),
       pointRadius, pointBackgroundColor: pointColor, pointBorderColor: '#fff',
       pointBorderWidth: 1.5, pointHoverRadius: 6,
-    }] }, options: { ...BASE, scales: AXES } });
+    }] }, options: { ...BASE, scales: AXES } }));
   } else if (c.type === 'doughnut') {
-    new Chart(el, { type: 'doughnut', data: { labels, datasets: [{
+    keep(new Chart(el, { type: 'doughnut', data: { labels, datasets: [{
       data: c.values, backgroundColor: c.colors || PALETTE, borderWidth: 2, borderColor: '#fff',
     }] }, options: { ...BASE, cutout: '62%',
       plugins: { ...BASE.plugins, legend: { display: true, position: RTL ? 'left' : 'right',
-        rtl: RTL, labels: { boxWidth: 10, boxHeight: 10, font: { size: 11.5 }, usePointStyle: true, pointStyle: 'circle' } } } } });
+        rtl: RTL, labels: { boxWidth: 10, boxHeight: 10, font: { size: 11.5 }, usePointStyle: true, pointStyle: 'circle' } } } } }));
   } else if (c.type === 'gauge') {
-    new Chart(el, { type: 'doughnut', data: { labels: [], datasets: [{
+    keep(new Chart(el, { type: 'doughnut', data: { labels: [], datasets: [{
       data: c.values, backgroundColor: [BRAND, '#e2e8f0'], borderWidth: 0,
-    }] }, options: { ...BASE, circumference: 180, rotation: -90, cutout: '74%' } });
+    }] }, options: { ...BASE, circumference: 180, rotation: -90, cutout: '74%' } }));
   } else {
     const horizontal = c.type === 'hbar';
     const colors = c.values.map((_, i) => (i === 0 && c.kind === 'breakdown' ? BRAND : '#94a3b8'));
-    new Chart(el, { type: 'bar', data: { labels, datasets: [{
+    keep(new Chart(el, { type: 'bar', data: { labels, datasets: [{
       data: c.values, backgroundColor: c.kind === 'histogram' ? '#64748b' : colors,
       borderRadius: 5, maxBarThickness: horizontal ? 22 : 46,
       categoryPercentage: c.kind === 'histogram' ? 1.0 : 0.82,
@@ -193,7 +205,7 @@ CHARTS.forEach((c) => {
     }] }, options: { ...BASE, indexAxis: horizontal ? 'y' : 'x',
       scales: horizontal
         ? { x: { ...AXES.y }, y: { ...AXES.x, ticks: { ...AXES.x.ticks, maxRotation: 0, autoSkip: false } } }
-        : AXES } });
+        : AXES } }));
   }
 });
 </script>

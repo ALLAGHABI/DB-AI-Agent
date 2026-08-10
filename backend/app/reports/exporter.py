@@ -152,9 +152,16 @@ def to_pdf(html: str) -> bytes | None:
             browser = p.chromium.launch()
             page = browser.new_page()
             page.set_content(html, wait_until="networkidle")
+            # تنسيق الطباعة يغيّر أبعاد البطاقات بعد رسم المخططات، فتبقى اللوحات
+            # بمقاسات الشاشة وتخرج عن إطارها — نبدّل الوسط ثم نعيد الرسم قبل التصدير.
+            page.emulate_media(media="print")
+            page.evaluate("() => (window.__charts || []).forEach(c => c.resize())")
+            page.wait_for_timeout(250)
+            # كل قالب يعلن مقاسه وهوامشه في @page (اللوحة عرضية) — نحترم إعلانه
             pdf = page.pdf(format="A4", print_background=True,
-                           margin={"top": "15mm", "bottom": "15mm",
-                                   "left": "12mm", "right": "12mm"})
+                           prefer_css_page_size=True,
+                           margin={"top": "0", "bottom": "0",
+                                   "left": "0", "right": "0"})
             browser.close()
             return pdf
     if engine == "weasyprint":

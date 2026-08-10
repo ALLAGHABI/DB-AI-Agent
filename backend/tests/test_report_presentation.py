@@ -70,3 +70,25 @@ def test_requesting_no_charts_yields_none():
     df = pd.DataFrame({"city": ["أ", "ب"] * 20, "amount": [10.0] * 40})
     assert chart_plan({"t": analyze_business(df)}, "dashboard", "ar",
                       requested=[]) == []
+
+
+def test_only_one_hero_and_no_chart_is_dropped():
+    """كل جدول قد يحمل اتجاهاً — والقالب يعرض رئيسياً واحداً، فلا يضيع الباقي."""
+    from app.reports.builder import GRID, build_report_html
+    frames = {}
+    for name in ("أ", "ب"):
+        frames[name] = analyze_business(pd.DataFrame({
+            "تاريخ": pd.date_range("2025-01-01", periods=120, freq="D"),
+            "فئة": [f"c{i % 6}" for i in range(120)],
+            "قيمة": [10.0] * 120,
+        }))
+    plan = chart_plan(frames, "dashboard", "ar")
+    assert sum(1 for c in plan if c["hero"]) == 1
+    html = build_report_html(
+        title="ت", profile={"kind": "multi", "overview": {"rows": 240, "cols": 3},
+                            "datasets": [], "relationships": [], "business": frames},
+        insights={"summary": "س", "findings": ["ن"], "recommendations": []},
+        language="ar", variant="dashboard", source_name="x", model_label="m",
+        created_at="2026-01-01 00:00", charts=plan)
+    for c in plan:
+        assert f'id="{c["id"]}"' in html, c["heading"]

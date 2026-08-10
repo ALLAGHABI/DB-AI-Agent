@@ -27,7 +27,10 @@ body { background: #fff; }
 .body { padding: 0 28px; }
 .kpi-row { margin-top: -14px; position: relative; z-index: 2; }
 .kpi { box-shadow: 0 2px 10px rgb(15 23 42 / .07); }
-.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.split { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+/* عمودان متساويان يتراجعان لعمود واحد على الشاشات الضيقة فقط — وعرض ورقة A4
+   يكفيهما بالضبط، فلا نترك الأمر لأساس ثابت قد يزيد ببكسلين فينهار العمودان. */
+.split > * { flex: 1 1 calc(50% - 8px); min-width: 250px; }
 .stack { display: grid; gap: 14px; }
 .summary-card { border-inline-start: 4px solid var(--brand); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -37,7 +40,7 @@ body { background: #fff; }
   border: none; border-inline-start: none;
 }
 @media print { .sheet { padding-bottom: 0; } .cwrap { height: 165px; } .cwrap.hero { height: 190px; } }
-@media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+
 {% endblock %}
 
 {% block content %}

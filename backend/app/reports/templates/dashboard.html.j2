@@ -26,26 +26,40 @@
   border-inline-start: 3px solid var(--brand); border-radius: 10px; padding: 10px 14px;
   margin-bottom: 14px;
 }
-.grid12 { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
-.grid12 > .kpi { grid-column: span 3; }
-.rail { grid-column: span 4; }
+/* شبكة من 12 خانة منفَّذة بـflex لا بـgrid: متصفح الطباعة يقسّم شبكة CSS
+   الممتدة على صفحتين تقسيماً خاطئاً فتتراكب البطاقات في PDF. */
+.grid12 { --gap: 14px; display: flex; flex-wrap: wrap; gap: var(--gap); align-items: flex-start; }
+/* خصائص مفردة لا اختصار flex: المتصفح لا يحسب var() داخل الاختصار فيُهمل السطر */
+.grid12 > * {
+  flex-grow: 0; flex-shrink: 1;
+  flex-basis: calc((var(--span, 12) / 12) * (100% + var(--gap)) - var(--gap));
+  min-width: 0;
+}
+/* شريط المؤشرات يوزّع نفسه على عرضه مهما كان عددها — لا خانات معلّقة */
+.kpi-strip { display: flex; flex-wrap: wrap; gap: 14px; }
+.kpi-strip > * { flex: 1 1 155px; }
+.block { margin-bottom: 14px; }
+.block:empty { display: none; margin: 0; }
+.rail { --span: 4; }
 .rail ol.findings li { font-size: 12.5px; }
 .band-head {
-  grid-column: span 12; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  --span: 12; font-size: 11px; font-weight: 700; letter-spacing: .1em;
   text-transform: uppercase; color: var(--ink-3); margin-top: 4px;
 }
-.conc { grid-column: span 4; }
+.conc { --span: 4; }
 @media print {
-  .grid12 { grid-template-columns: repeat(8, 1fr); gap: 10px; }
-  .grid12 > .kpi { grid-column: span 2; }
+  /* النسب نفسها عند الطباعة — تغيير الأعمدة يزيح البطاقات عن مقاسات
+     لوحات الرسم المحسوبة سلفاً. */
+  .grid12 { --gap: 9px; }
+  .wrap { padding: 12px 0 0; max-width: none; }
   .card, .rail { break-inside: avoid; }
-  .cwrap { height: 175px; } .cwrap.hero { height: 205px; }
-  .rail { grid-column: span 3; }
-  .card.chart-card[style] { grid-column: span 4 !important; }
+  .cwrap { height: 180px; } .cwrap.hero { height: 215px; }
+  .cwrap.tall { height: 235px; } .cwrap.short { height: 155px; }
 }
-@media (max-width: 900px) {
-  .grid12 { grid-template-columns: repeat(4, 1fr); }
-  .grid12 > .kpi, .rail, .conc, .card.chart-card[style] { grid-column: span 4 !important; }
+/* «screen» ضرورية: عرض ورقة A4 نحو 790 بكسل، فقاعدة الشاشات الضيقة كانت
+   تنطبق على الطباعة وتفرد كل بطاقة على عرض الصفحة. */
+@media screen and (max-width: 900px) {
+  .grid12 > * { flex-basis: 100% !important; }
 }
 {% endblock %}
 
@@ -70,11 +84,15 @@
   <div class="strap">{{ insights.summary }}</div>
   {% endif %}
 
-  <div class="grid12">
-    {% for k in kpis[:6] %}{{ m.kpi_card(k) }}{% endfor %}
+  {# كل كتلة شبكة مستقلة: Chromium يقسّم شبكةً واحدة عبر صفحتين تقسيماً خاطئاً
+     فتتراكب البطاقات في PDF — الفصل يجعل الفاصل بين الكتل لا داخلها. #}
+  {% if kpis %}
+  <div class="kpi-strip block">{% for k in kpis[:6] %}{{ m.kpi_card(k) }}{% endfor %}</div>
+  {% endif %}
 
+  {% if hero or ('findings' in sections and insights.findings) %}
+  <div class="grid12 block">
     {% if hero %}{{ m.chart_card(hero, hero=true) }}{% endif %}
-
     {% if 'findings' in sections and insights.findings %}
     <div class="card rail">
       <div class="kicker">{{ t.findings }}</div>
@@ -83,7 +101,10 @@
       </ol>
     </div>
     {% endif %}
+  </div>
+  {% endif %}
 
+  <div class="grid12 block">
     {% if concentration %}{{ m.conc_card(concentration, t) }}{% endif %}
 
     {% set ns = namespace(band=None) %}
@@ -94,9 +115,11 @@
       {% endif %}
       {{ m.chart_card(c) }}
     {% endfor %}
+  </div>
 
+  <div class="grid12 block">
     {% if 'recommendations' in sections and insights.recommendations %}
-    <div class="card" style="grid-column: span 12">
+    <div class="card" style="--span: 12">
       <div class="kicker">{{ t.recommendations }}</div>
       <ul class="recs" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));display:grid">
         {% for r in insights.recommendations %}<li>{{ r }}</li>{% endfor %}

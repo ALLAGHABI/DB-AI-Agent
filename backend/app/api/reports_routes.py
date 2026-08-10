@@ -23,6 +23,25 @@ def _store() -> ReportStore:
     return ReportStore(settings.data_dir)
 
 
+class AnalyzeTableIn(BaseModel):
+    table: str
+
+
+@router.post("/analyze-table")
+def analyze_table(body: AnalyzeTableIn):
+    """تحليل جدول متصل مباشرة — بلا تصدير ورفع يدوي."""
+    if not state.db.is_connected:
+        raise http_error("notConnected")
+    import pandas as pd
+    data = state.db.browse_rows(body.table, limit=100000, offset=0)
+    df = pd.DataFrame(data["rows"], columns=data["columns"])
+    if df.empty:
+        raise http_error("emptyTable", table=body.table)
+    profile = profile_df(df)
+    token = _store().save_temp(df, body.table)
+    return {"token": token, "profile": profile}
+
+
 @router.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
     data = await file.read()

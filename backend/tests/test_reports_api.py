@@ -88,3 +88,31 @@ def test_generate_with_bad_token_404(client):
     r = client.post("/api/reports/generate", json={
         "token": "nope", "title": "x", "provider": "ollama", "model": "m"})
     assert r.status_code == 404
+
+
+@respx.mock
+def test_analyze_table_directly(client, tmp_path):
+    """تقرير من جدول متصل — بلا تصدير/رفع."""
+    import sqlite3
+    db = tmp_path / "shop.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE sales (id INTEGER PRIMARY KEY, city TEXT, amount REAL);"
+        "INSERT INTO sales (city, amount) VALUES ('الرياض', 100), ('جدة', 250), ('الرياض', 75);")
+    con.commit(); con.close()
+    client.post("/api/db/connect", json={"url": f"sqlite:///{db}"})
+
+    r = client.post("/api/reports/analyze-table", json={"table": "sales"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["token"]
+    assert body["profile"]["overview"]["rows"] == 3
+
+    # جدول غير موجود يعطي رمز خطأ
+    r = client.post("/api/reports/analyze-table", json={"table": "nope"})
+    assert r.status_code == 404 and r.json()["detail"]["code"] == "tableMissing"
+
+
+def test_analyze_table_requires_connection(client):
+    r = client.post("/api/reports/analyze-table", json={"table": "x"})
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "notConnected"

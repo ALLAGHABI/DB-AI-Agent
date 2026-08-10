@@ -13,6 +13,7 @@ from ..reports.builder import build_report_html
 from ..reports.insights import generate_insights
 from ..reports.store import ReportStore
 from ..config import settings
+from ..errors import AppError, http_error
 from ..state import state
 
 router = APIRouter(prefix="/api/reports")
@@ -27,12 +28,12 @@ async def analyze(file: UploadFile = File(...)):
     data = await file.read()
     try:
         df = transfer.read_upload(file.filename or "upload", data)
-    except ValueError as e:
-        raise HTTPException(400, detail=str(e))
+    except AppError:
+        raise
     except Exception as e:
-        raise HTTPException(400, detail=f"تعذر قراءة الملف: {e}")
+        raise http_error("fileReadFailed", detail=str(e))
     if df.empty:
-        raise HTTPException(400, detail="الملف لا يحتوي بيانات")
+        raise http_error("emptyFile")
     profile = profile_df(df)
     token = _store().save_temp(df, file.filename or "upload")
     return {"token": token, "profile": profile}
@@ -50,31 +51,27 @@ class GenerateIn(BaseModel):
 @router.post("/generate")
 async def generate(body: GenerateIn):
     store = _store()
-    try:
-        df, source_name = store.load_temp(body.token)
-    except LookupError as e:
-        raise HTTPException(404, detail=str(e))
+    df, source_name = store.load_temp(body.token)
 
     profile = profile_df(df)
     try:
         provider = state.provider_by_id(body.provider)
     except KeyError:
-        raise HTTPException(400, detail=f"مزود غير معروف: {body.provider}")
+        raise http_error("unknownProvider", provider=body.provider)
     try:
         insights = await generate_insights(provider, body.model, profile, body.language)
     except Exception as e:
-        raise HTTPException(502, detail=f"فشل توليد الرؤى: {e}")
+        raise http_error("insightsFailed", 502, detail=str(e))
 
-    created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    now = datetime.datetime.now().astimezone()
+    created_at = now.strftime("%Y-%m-%d %H:%M")
+    created_iso = now.isoformat()
     model_label = f"{provider.id}/{body.model}"
-    try:
-        html = build_report_html(
-            title=body.title, profile=profile, insights=insights,
-            language=body.language, variant=body.template,
-            source_name=source_name, model_label=model_label,
-            created_at=created_at)
-    except ValueError as e:
-        raise HTTPException(400, detail=str(e))
+    html = build_report_html(
+        title=body.title, profile=profile, insights=insights,
+        language=body.language, variant=body.template,
+        source_name=source_name, model_label=model_label,
+        created_at=created_at)
     xlsx = exporter.to_xlsx(profile, insights, body.language)
     try:
         # Playwright السنكروني لا يعمل داخل حلقة asyncio — ننقله إلى thread
@@ -86,7 +83,8 @@ async def generate(body: GenerateIn):
     meta = {
         "title": body.title, "template": body.template, "language": body.language,
         "source_name": source_name, "model_label": model_label,
-        "created_at": created_at, "is_local": provider.is_local,
+        "created_at": created_at, "created_iso": created_iso,
+        "is_local": provider.is_local,
         "rows": profile["overview"]["rows"], "cols": profile["overview"]["cols"],
     }
     report_id = store.create(meta, html, xlsx, pdf)
@@ -109,11 +107,8 @@ _MEDIA = {
 @router.get("/{report_id}/{kind}")
 def get_report_file(report_id: str, kind: str):
     if kind not in _MEDIA:
-        raise HTTPException(404, detail="نوع غير معروف")
-    try:
-        data = _store().get_file(report_id, kind)
-    except LookupError as e:
-        raise HTTPException(404, detail=str(e))
+        raise http_error("unknownFileKind", 404, kind=kind)
+    data = _store().get_file(report_id, kind)
     media, disposition = _MEDIA[kind]
     headers = {}
     if disposition == "attachment":
@@ -123,8 +118,5 @@ def get_report_file(report_id: str, kind: str):
 
 @router.delete("/{report_id}")
 def delete_report(report_id: str):
-    try:
-        _store().delete(report_id)
-    except LookupError as e:
-        raise HTTPException(404, detail=str(e))
+    _store().delete(report_id)
     return {"success": True}

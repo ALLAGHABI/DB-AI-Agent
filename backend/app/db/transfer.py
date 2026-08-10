@@ -6,13 +6,14 @@ import tempfile
 import pandas as pd
 
 from .manager import DatabaseManager
+from ..errors import AppError
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
 def read_upload(filename: str, data: bytes) -> pd.DataFrame:
     if len(data) > MAX_UPLOAD_BYTES:
-        raise ValueError("حجم الملف يتجاوز الحد الأقصى (20MB)")
+        raise AppError("fileTooLarge", limit="20MB")
     name = filename.lower()
     if name.endswith(".csv"):
         return pd.read_csv(io.BytesIO(data))
@@ -20,17 +21,17 @@ def read_upload(filename: str, data: bytes) -> pd.DataFrame:
         return pd.read_excel(io.BytesIO(data))
     if name.endswith(".json"):
         return pd.read_json(io.BytesIO(data))
-    raise ValueError("صيغة غير مدعومة — المدعوم: CSV, Excel, JSON")
+    raise AppError("unsupportedFormat")
 
 
 def import_df(manager: DatabaseManager, df: pd.DataFrame, table: str, mode: str) -> int:
     if mode not in ("create", "append"):
-        raise ValueError("الوضع يجب أن يكون create أو append")
+        raise AppError("badImportMode")
     existing = {t["name"] for t in manager.schema_tables()}
     if mode == "create" and table in existing:
-        raise ValueError(f"الجدول موجود مسبقاً: {table} — استخدم وضع append")
+        raise AppError("tableExists", table=table)
     if mode == "append" and table not in existing:
-        raise ValueError(f"الجدول غير موجود: {table} — استخدم وضع create")
+        raise AppError("tableMissingForAppend", table=table)
     df.to_sql(table, manager.engine, if_exists="append" if mode == "append" else "fail",
               index=False)
     return len(df)
@@ -49,12 +50,12 @@ def export_table(manager: DatabaseManager, table: str, fmt: str) -> tuple[bytes,
         return (buf.getvalue(),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 f"{table}.xlsx")
-    raise ValueError("الصيغة المدعومة: csv أو xlsx")
+    raise AppError("badExportFormat")
 
 
 def sqlite_backup(manager: DatabaseManager) -> bytes:
     if manager.dialect != "sqlite":
-        raise ValueError("النسخ الاحتياطي المباشر متاح لقواعد SQLite فقط حالياً")
+        raise AppError("backupSqliteOnly")
     db_path = manager.engine.url.database
     with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
         src = sqlite3.connect(db_path)

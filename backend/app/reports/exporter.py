@@ -5,7 +5,7 @@ import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-_HEADER_FILL = PatternFill("solid", fgColor="2A78D6")
+_HEADER_FILL = PatternFill("solid", fgColor="059669")
 _HEADER_FONT = Font(color="FFFFFF", bold=True)
 
 

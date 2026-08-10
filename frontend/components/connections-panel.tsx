@@ -3,6 +3,7 @@ import { Table2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useApiError } from '@/lib/use-api-error';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ type DbType = 'sqlite' | 'mysql' | 'postgresql';
 
 export function ConnectionsPanel({ onConnected }: { onConnected: (tables: string[]) => void }) {
   const t = useTranslations('connections');
+  const { showError } = useApiError();
   const [type, setType] = useState<DbType>('sqlite');
   const [sqlitePath, setSqlitePath] = useState('data/sample_store.db');
   const [server, setServer] = useState({ host: 'localhost', port: '', database: '', username: '', password: '' });
@@ -38,7 +40,7 @@ export function ConnectionsPanel({ onConnected }: { onConnected: (tables: string
       onConnected(res.tables);
       toast.success(t('connectSuccess'));
     } catch (e) {
-      toast.error((e as Error).message);
+      showError(e);
     } finally {
       setBusy(false);
     }

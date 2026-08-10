@@ -158,3 +158,47 @@ def test_backup_sqlite(connected):
     r = connected.get("/api/db/backup")
     assert r.status_code == 200
     assert r.content[:16] == b"SQLite format 3\x00"
+
+
+# ---------- عقد الأخطاء: رموز لا نصوص بلغة واحدة ----------
+
+def test_errors_return_codes_not_prose(client, sample_db):
+    # غير متصل
+    r = client.get("/api/db/schema")
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "notConnected"
+
+    client.post("/api/db/connect", json={"url": f"sqlite:///{sample_db}"})
+
+    # جدول غير موجود
+    r = client.get("/api/db/table/nope/rows")
+    assert r.status_code == 404 and r.json()["detail"]["code"] == "tableMissing"
+    assert r.json()["detail"]["params"]["table"] == "nope"
+
+    # عمود فرز غير معروف
+    r = client.get("/api/db/table/products/rows", params={"order_by": "zzz"})
+    assert r.json()["detail"]["code"] == "unknownSortColumn"
+
+    # استعلام كتابة بلا تأكيد
+    r = client.post("/api/db/execute", json={"sql": "DELETE FROM products"})
+    body = r.json()["detail"]
+    assert r.status_code == 409
+    assert body["code"] == "writeNeedsConfirm" and body["sql_class"] == "write"
+
+    # ملف قاعدة غير موجود
+    r = client.post("/api/db/connect", json={"url": "sqlite:///nope/none.db"})
+    assert r.status_code == 404 and r.json()["detail"]["code"] == "dbFileMissing"
+
+
+def test_no_arabic_prose_in_api_errors(client, sample_db):
+    """أي رسالة خطأ يجب ألا تحمل نصاً عربياً — الترجمة في الواجهة."""
+    client.post("/api/db/connect", json={"url": f"sqlite:///{sample_db}"})
+    responses = [
+        client.get("/api/db/table/nope/rows"),
+        client.post("/api/db/table/products/rows", json={"values": {"bad": 1}}),
+        client.put("/api/db/table/products/rows", json={"pk": {}, "values": {"name": "x"}}),
+        client.post("/api/db/execute", json={"sql": "NOT SQL AT ALL !!!"}),
+    ]
+    for r in responses:
+        text = r.text
+        assert not any("؀" <= ch <= "ۿ" for ch in text), text[:200]

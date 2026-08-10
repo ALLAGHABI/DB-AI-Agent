@@ -3,6 +3,7 @@ import sqlite3
 import pytest
 
 from app.db.manager import DatabaseManager, ExecutionBlocked
+from app.errors import NotFoundError
 
 
 @pytest.fixture
@@ -58,8 +59,9 @@ def test_sqlite_missing_file_rejected(tmp_path):
     """يجب رفض ملف SQLite غير موجود بدل إنشاء قاعدة فارغة بصمت."""
     m = DatabaseManager()
     missing = tmp_path / "nope.db"
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(NotFoundError) as e:
         m.connect(f"sqlite:///{missing}")
+    assert e.value.code == "dbFileMissing"
     assert not missing.exists()          # لم يُنشأ ملف فارغ
     assert m.is_connected is False
 

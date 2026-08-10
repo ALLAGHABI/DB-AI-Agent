@@ -2,9 +2,10 @@
 import {
   Cloud, Cpu, Download, ExternalLink, FileSpreadsheet, FileText, Sparkles, Trash2, Upload,
 } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useApiError } from '@/lib/use-api-error';
 import { api, type ReportMeta, type ReportProfile } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,8 @@ import type { ModelSelection } from './providers-panel';
 export function ReportsStudio({ selection }: { selection: ModelSelection | null }) {
   const t = useTranslations('reports');
   const locale = useLocale();
+  const format = useFormatter();
+  const { showError } = useApiError();
   const fileRef = useRef<HTMLInputElement>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -33,8 +36,9 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
   const [generating, setGenerating] = useState(false);
   const [reports, setReports] = useState<ReportMeta[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
-  useEffect(() => { api.reportsList().then(setReports).catch(() => {}); }, []);
+  useEffect(() => { api.reportsList().then(setReports).catch(showError); }, [showError]);
 
   const analyze = async (file: File) => {
     setAnalyzing(true);
@@ -46,7 +50,7 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
       setSourceName(file.name);
       if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
     } catch (e) {
-      toast.error((e as Error).message);
+      showError(e);
     } finally {
       setAnalyzing(false);
     }
@@ -62,9 +66,8 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
       });
       setReports(r => [meta, ...r]);
       toast.success(t('generated'));
-      window.open(api.reportFileUrl(meta.id, 'html'), '_blank');
     } catch (e) {
-      toast.error((e as Error).message);
+      showError(e);
     } finally {
       setGenerating(false);
     }
@@ -75,8 +78,9 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
     try {
       await api.reportDelete(deleteId);
       setReports(r => r.filter(x => x.id !== deleteId));
-    } catch (e) { toast.error((e as Error).message); }
-    setDeleteId(null);
+      toast.success(t('deleted'));
+      setDeleteId(null);
+    } catch (e) { showError(e); }
   };
 
   return (
@@ -87,7 +91,14 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
         </CardHeader>
         <CardContent className="space-y-4">
           <button type="button"
-            className="flex w-full cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8 text-sm text-muted-foreground transition-colors hover:border-primary hover:bg-accent/40"
+            className={`flex w-full cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8 text-sm text-muted-foreground transition-colors hover:border-primary hover:bg-accent/40 ${dragging ? 'border-primary bg-accent/40' : ''}`}
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={e => {
+              e.preventDefault(); setDragging(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) analyze(f);
+            }}
             onClick={() => fileRef.current?.click()}>
             <Upload className="h-6 w-6" />
             {analyzing ? t('analyzing') : t('uploadHint')}
@@ -95,15 +106,16 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
           </button>
           <input ref={fileRef} type="file" hidden accept=".csv,.xlsx,.xls,.json"
             onChange={e => e.target.files?.[0] && analyze(e.target.files[0])} />
+          {!selection && <p className="text-xs text-destructive">{t('needModel')}</p>}
 
           {profile && (
             <>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
-                  [profile.overview.rows.toLocaleString(), t('rows')],
-                  [String(profile.overview.cols), t('cols')],
-                  [`${profile.overview.missing_pct}%`, t('missing')],
-                  [String(profile.overview.duplicate_rows), t('duplicates')],
+                  [format.number(profile.overview.rows), t('rows')],
+                  [format.number(profile.overview.cols), t('cols')],
+                  [format.number(profile.overview.missing_pct / 100, { style: 'percent', maximumFractionDigits: 2 }), t('missing')],
+                  [format.number(profile.overview.duplicate_rows), t('duplicates')],
                 ].map(([v, l]) => (
                   <div key={l} className="rounded-lg border bg-muted/40 p-3 text-center">
                     <div className="text-xl font-bold tabular-nums">{v}</div>
@@ -176,7 +188,11 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
                         <FileText className="h-4 w-4 text-primary" />{r.title}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {r.source_name} · {r.rows.toLocaleString()} × {r.cols} · {r.created_at}
+                        <bdi>{r.source_name}</bdi> · {format.number(r.rows)} × {format.number(r.cols)}
+                        {' · '}
+                        {r.created_iso
+                          ? format.dateTime(new Date(r.created_iso), { dateStyle: 'medium', timeStyle: 'short' })
+                          : r.created_at}
                       </div>
                     </div>
                     <Badge variant="outline" className="gap-1 text-xs">

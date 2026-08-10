@@ -28,13 +28,17 @@ const AUTHOR = {
   linkedin: 'https://www.linkedin.com/in/aliallaghabi/',
 };
 
-export function Shell({ sidebar, main, connected }: {
-  sidebar: React.ReactNode; main: React.ReactNode; connected: boolean;
+export function Shell({ sidebar, main, connected, apiDown = false }: {
+  sidebar: React.ReactNode; main: React.ReactNode; connected: boolean; apiDown?: boolean;
 }) {
   const t = useTranslations('app');
   const ts = useTranslations('status');
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <a href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
+        {t('skipToContent')}
+      </a>
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <div className="flex items-center gap-2.5">
@@ -42,8 +46,8 @@ export function Shell({ sidebar, main, connected }: {
               <Database className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-sm font-bold leading-tight">{t('name')}</div>
-              <div className="text-xs text-muted-foreground leading-tight">{t('tagline')}</div>
+              <h1 className="text-sm font-bold leading-tight">{t('name')}</h1>
+              <p className="text-xs text-muted-foreground leading-tight">{t('tagline')}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -55,9 +59,14 @@ export function Shell({ sidebar, main, connected }: {
           </div>
         </div>
       </header>
+      {apiDown && (
+        <div role="alert" className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-center text-xs text-destructive">
+          {t('apiDown')}
+        </div>
+      )}
       <div className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-[340px_1fr]">
-        <aside className="space-y-4">{sidebar}</aside>
-        <main className="min-w-0 space-y-4">{main}</main>
+        <aside className="space-y-4" aria-label={t('settingsRegion')}>{sidebar}</aside>
+        <main id="main" className="min-w-0 space-y-4">{main}</main>
       </div>
       <footer className="border-t">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-muted-foreground">

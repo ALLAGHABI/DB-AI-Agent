@@ -56,18 +56,18 @@
   --card-foreground: oklch(0.208 0.042 265.755);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.208 0.042 265.755);
-  --primary: oklch(0.596 0.145 163.225);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.508 0.118 165.6);          /* emerald-700 — 4.9:1 مع الأبيض */
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
+  --muted-foreground: oklch(0.478 0.043 257.3);  /* slate-600 — يمر AA عند 12px */
   --accent: oklch(0.951 0.026 163.508);
   --accent-foreground: oklch(0.262 0.051 172.552);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.929 0.013 255.508);
   --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.596 0.145 163.225);
+  --ring: oklch(0.508 0.118 165.6);
   --chart-1: oklch(0.596 0.145 163.225);
   --chart-2: oklch(0.588 0.158 241.966);
   --chart-3: oklch(0.606 0.25 292.717);

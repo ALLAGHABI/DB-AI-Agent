@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useApiError } from '@/lib/use-api-error';
 import { api, type ExecResult } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -16,6 +17,7 @@ export function SqlEditor({ connected }: { connected: boolean }) {
   const t = useTranslations('sqlEditor');
   const tq = useTranslations('query');
   const { theme } = useTheme();
+  const { showError } = useApiError();
   const [code, setCode] = useState('SELECT * FROM ');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ExecResult | null>(null);
@@ -27,11 +29,11 @@ export function SqlEditor({ connected }: { connected: boolean }) {
     try {
       const res = await api.execute(code.trim(), confirm);
       setResult(res);
-      if (res.kind === 'affected') toast.success(`${res.affected} ${tq('affected')}`);
+      if (res.kind === 'affected') toast.success(tq('affectedCount', { count: res.affected }));
     } catch (e) {
-      const err = e as Error & { status?: number };
+      const err = e as { status?: number };
       if (err.status === 409) setPendingSql(code.trim());
-      else toast.error(err.message);
+      else showError(e);
     } finally {
       setBusy(false);
     }
@@ -51,14 +53,15 @@ export function SqlEditor({ connected }: { connected: boolean }) {
               placeholder={t('placeholder')}
               onChange={setCode} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-3">
+            {!connected && <span className="text-xs text-destructive">{t('needsConnection')}</span>}
             <Button onClick={() => run(false)} disabled={!connected || busy || !code.trim()} className="gap-2">
               <Play className="h-4 w-4" />{busy ? t('running') : t('run')}
             </Button>
           </div>
           {result?.kind === 'rows' && <ResultsTable columns={result.columns} rows={result.rows} />}
           {result?.kind === 'affected' && (
-            <div className="py-4 text-center text-sm">{result.affected} {tq('affected')}</div>
+            <div className="py-4 text-center text-sm">{tq('affectedCount', { count: result.affected })}</div>
           )}
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 import pytest
 
 from app.db.sql_guard import classify, ensure_limit, SqlClass
+from app.errors import AppError
 
 
 @pytest.mark.parametrize("sql,expected", [
@@ -19,13 +20,15 @@ def test_classify(sql, expected):
 
 
 def test_classify_rejects_multiple_statements():
-    with pytest.raises(ValueError):
+    with pytest.raises(AppError) as e:
         classify("SELECT 1; DROP TABLE t")
+    assert e.value.code == "singleStatementOnly"
 
 
 def test_classify_rejects_unparseable():
-    with pytest.raises(ValueError):
+    with pytest.raises(AppError) as e:
         classify("NOT REALLY SQL AT ALL !!!")
+    assert e.value.code == "sqlParseFailed"
 
 
 def test_ensure_limit_adds_when_missing():

@@ -19,22 +19,31 @@ export default function Home() {
   const [selection, setSelection] = useState<ModelSelection | null>(null);
   const onModelChange = useCallback((s: ModelSelection | null) => setSelection(s), []);
 
-  // استعادة حالة الاتصال بعد إعادة تحميل الصفحة (تبديل اللغة مثلاً)
-  useEffect(() => {
-    api.status().then(s => {
-      if (s.db_connected) { setTables(s.tables); setDialect(s.dialect); }
-    }).catch(() => {});
+  const [apiDown, setApiDown] = useState(false);
+
+  const syncStatus = useCallback(async () => {
+    try {
+      const s = await api.status();
+      setApiDown(false);
+      setTables(s.db_connected ? s.tables : []);
+      setDialect(s.dialect);
+    } catch {
+      setApiDown(true);
+    }
   }, []);
+
+  // استعادة حالة الاتصال بعد إعادة تحميل الصفحة (تبديل اللغة مثلاً)
+  useEffect(() => { syncStatus(); }, [syncStatus]);
 
   const onConnected = useCallback((tbs: string[]) => {
     setTables(tbs);
-    api.status().then(s => setDialect(s.dialect)).catch(() => {});
-  }, []);
+    syncStatus();
+  }, [syncStatus]);
 
   const connected = tables.length > 0;
 
   return (
-    <Shell connected={connected}
+    <Shell connected={connected} apiDown={apiDown}
       sidebar={<>
         <ConnectionsPanel onConnected={onConnected} />
         <ProvidersPanel onModelChange={onModelChange} />
@@ -52,7 +61,7 @@ export default function Home() {
             <QueryWorkspace connected={connected} selection={selection} />
           </TabsContent>
           <TabsContent value="tables">
-            <TablesBrowser tables={tables} dialect={dialect} />
+            <TablesBrowser tables={tables} dialect={dialect} onSchemaChanged={syncStatus} />
           </TabsContent>
           <TabsContent value="er">
             <ErDiagram connected={connected} />

@@ -24,7 +24,8 @@
     "tables": "الجداول",
     "er": "المخطط",
     "sql": "محرر SQL",
-    "reports": "التقارير"
+    "reports": "التقارير",
+    "history": "السجل"
   },
   "query": {
     "title": "ماذا تريد أن تعرف؟",
@@ -84,7 +85,9 @@
     "deletedCount": "حُذف {ok} من {total}",
     "importFile": "الملف",
     "needsConnection": "اتصل بقاعدة بيانات لتصفح الجداول",
-    "rowCount": "{count, plural, =0 {لا توجد صفوف} one {صف واحد} two {صفّان} few {# صفوف} other {# صفاً}}"
+    "rowCount": "{count, plural, =0 {لا توجد صفوف} one {صف واحد} two {صفّان} few {# صفوف} other {# صفاً}}",
+    "reportFromTable": "تقرير من هذا الجدول",
+    "analyzing": "جارٍ التحليل…"
   },
   "er": {
     "empty": "اتصل بقاعدة بيانات لعرض المخطط",
@@ -113,7 +116,15 @@
     "connect": "اتصال",
     "connecting": "جارٍ الاتصال…",
     "connectedTables": "الجداول",
-    "connectSuccess": "تم الاتصال بنجاح"
+    "connectSuccess": "تم الاتصال بنجاح",
+    "saved": "الاتصالات المحفوظة",
+    "save": "احفظ هذا الاتصال",
+    "saveName": "اسم الاتصال",
+    "saved_ok": "تم حفظ الاتصال",
+    "use": "اتصل",
+    "remove": "حذف",
+    "noneSaved": "لا توجد اتصالات محفوظة",
+    "savePrompt": "سمِّ الاتصال لحفظه"
   },
   "settings": {
     "title": "نموذج الذكاء الاصطناعي",
@@ -206,5 +217,27 @@
     "unknownFileKind": "نوع ملف غير معروف: {kind}",
     "unknownTemplate": "قالب غير معروف: {template}",
     "unsupportedLanguage": "لغة غير مدعومة: {language}"
+  },
+  "history": {
+    "title": "سجل الاستعلامات",
+    "hint": "انقر ▶ لإعادة استخدام أي استعلام",
+    "empty": "لا توجد استعلامات بعد",
+    "favoritesOnly": "المفضلة",
+    "clear": "مسح السجل",
+    "cleared": "حُذف {count} استعلام",
+    "failed": "فشل",
+    "reuse": "إعادة الاستخدام",
+    "favorite": "تمييز كمفضل",
+    "delete": "حذف",
+    "rows": "{count, plural, =0 {بلا نتائج} one {نتيجة واحدة} two {نتيجتان} few {# نتائج} other {# نتيجة}}"
+  },
+  "chart": {
+    "title": "رسم بياني",
+    "xAxis": "المحور الأفقي",
+    "yAxis": "القيمة",
+    "bar": "أعمدة",
+    "line": "خط",
+    "needsNumeric": "يحتاج الرسم عموداً رقمياً واحداً على الأقل",
+    "limited": "يعرض أول {max} صف"
   }
 }

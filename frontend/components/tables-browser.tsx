@@ -1,6 +1,6 @@
 'use client';
 import {
-  ArrowUpDown, ChevronLeft, ChevronRight, Download, HardDriveDownload, KeyRound,
+  ArrowUpDown, ChevronLeft, ChevronRight, Download, FileBarChart, HardDriveDownload, KeyRound,
   Loader2, Plus, Trash2, Upload,
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -25,8 +25,9 @@ import {
 
 const PAGE = 50;
 
-export function TablesBrowser({ tables, dialect, onSchemaChanged }: {
+export function TablesBrowser({ tables, dialect, onSchemaChanged, onReportFromTable }: {
   tables: string[]; dialect: string | null; onSchemaChanged: () => void;
+  onReportFromTable: (table: string) => void;
 }) {
   const t = useTranslations('tables');
   const locale = useLocale();
@@ -164,6 +165,10 @@ export function TablesBrowser({ tables, dialect, onSchemaChanged }: {
                 <Trash2 className="h-3.5 w-3.5" />{t('deleteSelected')} ({selected.size})
               </Button>
             )}
+            <Button variant="outline" size="sm" className="gap-1.5"
+              onClick={() => onReportFromTable(table)}>
+              <FileBarChart className="h-3.5 w-3.5" />{t('reportFromTable')}
+            </Button>
             <Button variant="outline" size="sm" className="gap-1.5"
               onClick={() => { window.location.href = api.exportUrl(table, 'csv'); }}>
               <Download className="h-3.5 w-3.5" />{t('exportCsv')}

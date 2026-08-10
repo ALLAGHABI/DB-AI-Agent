@@ -189,12 +189,28 @@ class ExecuteIn(BaseModel):
 def db_execute(body: ExecuteIn):
     if not state.db.is_connected:
         raise http_error("notConnected")
+
+    def record(sql_class: str, rows: int, success: bool) -> None:
+        try:
+            state.history.add(sql=body.sql, sql_class=sql_class, source=body.source,
+                              request=body.request, model=body.model,
+                              rows=rows, success=success)
+        except Exception as e:                 # السجل مساعد — لا يُفشل الاستعلام
+            print(f"history write failed: {e}")
+
     try:
         res = state.db.execute(body.sql, confirm_write=body.confirm_write)
+    except ExecutionBlocked:
+        raise                                  # لم يُنفَّذ بعد — لا يُسجَّل
     except AppError:
+        record("unknown", 0, False)
         raise
     except Exception as e:
+        record("unknown", 0, False)
         raise http_error("executeFailed", detail=str(e))
+
+    record("read" if res.kind == "rows" else "write",
+           len(res.rows) if res.kind == "rows" else res.affected, True)
     return asdict(res)
 
 

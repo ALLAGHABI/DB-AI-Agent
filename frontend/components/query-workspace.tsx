@@ -1,7 +1,7 @@
 'use client';
 import { Cloud, Cpu, Database, Play, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useApiError } from '@/lib/use-api-error';
 import { api, type ExecResult, type GenerateResult } from '@/lib/api';
@@ -12,17 +12,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmWriteDialog } from './confirm-write-dialog';
 import type { ModelSelection } from './providers-panel';
+import { ResultsChart } from './results-chart';
 import { ResultsTable } from './results-table';
 
 type Phase = 'idle' | 'generating' | 'running';
 
-export function QueryWorkspace({ connected, selection }: {
+export function QueryWorkspace({ connected, selection, initialRequest, initialSql }: {
   connected: boolean; selection: ModelSelection | null;
+  initialRequest?: string; initialSql?: string;
 }) {
   const t = useTranslations('query');
   const ts = useTranslations('status');
+  const tc = useTranslations('chart');
   const { showError } = useApiError();
   const [request, setRequest] = useState('');
+
+  // إعادة استخدام استعلام من السجل
+  useEffect(() => {
+    if (initialRequest !== undefined) setRequest(initialRequest);
+  }, [initialRequest]);
+  useEffect(() => {
+    if (!initialSql) return;
+    setGenerated({ sql: initialSql, sql_class: 'read', provider: '', model: '', is_local: true });
+    api.execute(initialSql, false, { source: 'editor' })
+      .then(setResult).catch(showError);
+  }, [initialSql]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [phase, setPhase] = useState<Phase>('idle');
   const [generated, setGenerated] = useState<GenerateResult | null>(null);
   const [result, setResult] = useState<ExecResult | null>(null);
@@ -39,7 +53,8 @@ export function QueryWorkspace({ connected, selection }: {
       setGenerated(gen);
       if (gen.sql_class === 'read') {
         setPhase('running');
-        setResult(await api.execute(gen.sql));
+        setResult(await api.execute(gen.sql, false,
+          { source: 'nl', request: request.trim(), model: selection.model }));
       } else {
         setPendingWrite(gen);
       }
@@ -55,7 +70,8 @@ export function QueryWorkspace({ connected, selection }: {
     setPendingWrite(null);
     setPhase('running');
     try {
-      const res = await api.execute(pendingWrite.sql, true);
+      const res = await api.execute(pendingWrite.sql, true,
+        { source: 'nl', request: request.trim(), model: selection?.model });
       setResult(res);
       toast.success(t('affectedCount', { count: res.affected }));
     } catch (e) {
@@ -116,6 +132,7 @@ export function QueryWorkspace({ connected, selection }: {
           <Tabs defaultValue="data">
             <TabsList>
               <TabsTrigger value="data">{t('results')}</TabsTrigger>
+              <TabsTrigger value="chart" disabled={result?.kind !== 'rows'}>{tc('title')}</TabsTrigger>
               <TabsTrigger value="sql">{t('sql')}</TabsTrigger>
             </TabsList>
             <TabsContent value="data" className="pt-3">
@@ -129,6 +146,11 @@ export function QueryWorkspace({ connected, selection }: {
                       <p className="text-sm text-muted-foreground">{t('emptyHint')}</p>
                     </div>
                   )}
+            </TabsContent>
+            <TabsContent value="chart" className="pt-3">
+              {result?.kind === 'rows'
+                ? <ResultsChart columns={result.columns} rows={result.rows} />
+                : <p className="py-10 text-center text-sm text-muted-foreground">{t('emptyHint')}</p>}
             </TabsContent>
             <TabsContent value="sql" className="pt-3">
               <pre dir="ltr" className="overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm leading-relaxed">

@@ -20,7 +20,9 @@ import {
 } from '@/components/ui/select';
 import type { ModelSelection } from './providers-panel';
 
-export function ReportsStudio({ selection }: { selection: ModelSelection | null }) {
+export function ReportsStudio({ selection, tableToAnalyze }: {
+  selection: ModelSelection | null; tableToAnalyze?: string;
+}) {
   const t = useTranslations('reports');
   const locale = useLocale();
   const format = useFormatter();
@@ -39,6 +41,22 @@ export function ReportsStudio({ selection }: { selection: ModelSelection | null 
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => { api.reportsList().then(setReports).catch(showError); }, [showError]);
+
+  // تحليل جدول متصل مباشرة (زر "تقرير من هذا الجدول")
+  useEffect(() => {
+    if (!tableToAnalyze) return;
+    setAnalyzing(true);
+    setProfile(null); setToken(null);
+    api.reportAnalyzeTable(tableToAnalyze)
+      .then(res => {
+        setToken(res.token);
+        setProfile(res.profile);
+        setSourceName(tableToAnalyze);
+        setTitle(tableToAnalyze);
+      })
+      .catch(showError)
+      .finally(() => setAnalyzing(false));
+  }, [tableToAnalyze]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const analyze = async (file: File) => {
     setAnalyzing(true);

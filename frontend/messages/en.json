@@ -24,7 +24,8 @@
     "tables": "Tables",
     "er": "Schema",
     "sql": "SQL Editor",
-    "reports": "Reports"
+    "reports": "Reports",
+    "history": "History"
   },
   "query": {
     "title": "What do you want to know?",
@@ -84,7 +85,9 @@
     "deletedCount": "Deleted {ok} of {total}",
     "importFile": "File",
     "needsConnection": "Connect a database to browse tables",
-    "rowCount": "{count, plural, =0 {No rows} one {1 row} other {# rows}}"
+    "rowCount": "{count, plural, =0 {No rows} one {1 row} other {# rows}}",
+    "reportFromTable": "Report from this table",
+    "analyzing": "Analyzing…"
   },
   "er": {
     "empty": "Connect a database to view the schema",
@@ -113,7 +116,15 @@
     "connect": "Connect",
     "connecting": "Connecting…",
     "connectedTables": "Tables",
-    "connectSuccess": "Connected successfully"
+    "connectSuccess": "Connected successfully",
+    "saved": "Saved connections",
+    "save": "Save this connection",
+    "saveName": "Connection name",
+    "saved_ok": "Connection saved",
+    "use": "Connect",
+    "remove": "Delete",
+    "noneSaved": "No saved connections",
+    "savePrompt": "Name this connection to save it"
   },
   "settings": {
     "title": "AI Model",
@@ -206,5 +217,27 @@
     "unknownFileKind": "Unknown file type: {kind}",
     "unknownTemplate": "Unknown template: {template}",
     "unsupportedLanguage": "Unsupported language: {language}"
+  },
+  "history": {
+    "title": "Query history",
+    "hint": "Click ▶ to reuse any query",
+    "empty": "No queries yet",
+    "favoritesOnly": "Favorites",
+    "clear": "Clear history",
+    "cleared": "Removed {count} queries",
+    "failed": "Failed",
+    "reuse": "Reuse",
+    "favorite": "Favorite",
+    "delete": "Delete",
+    "rows": "{count, plural, =0 {no results} one {1 result} other {# results}}"
+  },
+  "chart": {
+    "title": "Chart",
+    "xAxis": "X axis",
+    "yAxis": "Value",
+    "bar": "Bars",
+    "line": "Line",
+    "needsNumeric": "Charting needs at least one numeric column",
+    "limited": "Showing first {max} rows"
   }
 }

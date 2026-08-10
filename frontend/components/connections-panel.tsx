@@ -1,10 +1,10 @@
 'use client';
-import { Table2 } from 'lucide-react';
+import { Bookmark, Plug, Table2, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useApiError } from '@/lib/use-api-error';
-import { api } from '@/lib/api';
+import { api, type SavedConnection } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,42 @@ export function ConnectionsPanel({ onConnected }: { onConnected: (tables: string
   const [server, setServer] = useState({ host: 'localhost', port: '', database: '', username: '', password: '' });
   const [busy, setBusy] = useState(false);
   const [tables, setTables] = useState<string[]>([]);
+  const [saved, setSaved] = useState<SavedConnection[]>([]);
+  const [saveName, setSaveName] = useState('');
+
+  const loadSaved = useCallback(async () => {
+    try { setSaved(await api.connectionsList()); } catch { /* قائمة فارغة تكفي */ }
+  }, []);
+  useEffect(() => { loadSaved(); }, [loadSaved]);
+
+  const saveConnection = async () => {
+    if (!saveName.trim()) return;
+    try {
+      await api.connectionAdd({
+        name: saveName.trim(), type,
+        sqlite_file: type === 'sqlite' ? sqlitePath.trim() : '',
+        host: server.host, port: server.port, database: server.database,
+        username: server.username, password: server.password,
+      });
+      setSaveName('');
+      toast.success(t('saved_ok'));
+      loadSaved();
+    } catch (e) { showError(e); }
+  };
+
+  const useConnection = async (conn: SavedConnection) => {
+    setBusy(true);
+    try {
+      const res = await api.connectionUse(conn.id);
+      setTables(res.tables);
+      onConnected(res.tables);
+      toast.success(t('connectSuccess'));
+    } catch (e) { showError(e); } finally { setBusy(false); }
+  };
+
+  const removeConnection = async (id: string) => {
+    try { await api.connectionDelete(id); loadSaved(); } catch (e) { showError(e); }
+  };
 
   const buildUrl = () => {
     if (type === 'sqlite') return `sqlite:///${sqlitePath.trim()}`;
@@ -92,6 +128,42 @@ export function ConnectionsPanel({ onConnected }: { onConnected: (tables: string
         <Button className="w-full" onClick={connect} disabled={busy}>
           {busy ? t('connecting') : t('connect')}
         </Button>
+
+        <div className="space-y-1.5 border-t pt-3">
+          <Label className="text-xs">{t('save')}</Label>
+          <div className="flex gap-1.5">
+            <Input dir="auto" value={saveName} placeholder={t('saveName')}
+              onChange={e => setSaveName(e.target.value)} />
+            <Button variant="secondary" size="icon" aria-label={t('save')}
+              onClick={saveConnection} disabled={!saveName.trim()}>
+              <Bookmark className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {saved.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">{t('saved')}</Label>
+            <ul className="space-y-1">
+              {saved.map(c => (
+                <li key={c.id} className="flex items-center gap-1 rounded-lg border px-2 py-1.5">
+                  <span className="min-w-0 flex-1 truncate text-xs" dir="auto">
+                    {c.name}
+                    <span className="ms-1.5 font-mono text-[10px] text-muted-foreground">{c.type}</span>
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" aria-label={t('use')}
+                    onClick={() => useConnection(c)} disabled={busy}>
+                    <Plug className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"
+                    aria-label={t('remove')} onClick={() => removeConnection(c.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {tables.length > 0 && (
           <div className="space-y-1.5 pt-1">

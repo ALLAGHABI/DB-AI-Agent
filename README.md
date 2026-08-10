@@ -57,6 +57,10 @@ styled Excel workbook — with a browsable archive.
 
 <img src="docs/screenshots/report-ar.png" alt="Generated report" width="800">
 
+### 📈 Instant charts & query history · رسوم فورية وسجل استعلامات
+Turn any result set into a bar or line chart with one click, and reuse past queries
+from a searchable history with favorites.
+
 ### 🌍 Bilingual & themed · لغتان وثيمان
 Full Arabic (RTL) and English (LTR) with one-click switching; dark and light themes.
 
@@ -123,7 +127,7 @@ flowchart LR
 
 ## 🧪 Quality
 
-- **75 automated backend tests** (pytest) covering the SQL guard (incl. CTE edge cases),
+- **92 automated backend tests** (pytest) covering the SQL guard (incl. CTE edge cases),
   CRUD identifier safety, secrets non-exposure, report generation, and the full API.
 - CI runs tests + a production frontend build on every push.
 - Every phase was verified end-to-end in a real browser against a real local model.
@@ -148,7 +152,8 @@ cd backend && .venv/bin/pytest
 - [x] Phase 2 — Management suite: ER diagram, CRUD grid, SQL editor, import/export/backup
 - [x] Phase 3 — Reports Studio: profiling, AI insights, HTML/PDF/Excel exports, archive
 - [x] Phase 4 — Docker, CI, docs
-- [ ] Hosted demo · query history · scheduled reports · NoSQL
+- [x] Phase 5 — Query history, instant charts, saved connections, reports from live tables
+- [ ] Hosted demo · scheduled reports · NoSQL
 
 ## 👤 Author · المطور
 

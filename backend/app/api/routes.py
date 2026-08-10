@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from ..agent.nl2sql import build_prompt, extract_sql
 from ..db import transfer
+from ..db.manager import ExecutionBlocked
 from ..db.sql_guard import classify
 from ..errors import AppError, http_error
 from ..state import state
@@ -179,18 +180,37 @@ def db_backup():
 class ExecuteIn(BaseModel):
     sql: str
     confirm_write: bool = False
+    source: str = "editor"            # "editor" | "nl"
+    request: str | None = None        # نص الطلب الطبيعي إن وُجد
+    model: str | None = None
 
 
 @router.post("/db/execute")
 def db_execute(body: ExecuteIn):
     if not state.db.is_connected:
         raise http_error("notConnected")
+
+    def record(sql_class: str, rows: int, success: bool) -> None:
+        try:
+            state.history.add(sql=body.sql, sql_class=sql_class, source=body.source,
+                              request=body.request, model=body.model,
+                              rows=rows, success=success)
+        except Exception as e:                 # السجل مساعد — لا يُفشل الاستعلام
+            print(f"history write failed: {e}")
+
     try:
         res = state.db.execute(body.sql, confirm_write=body.confirm_write)
+    except ExecutionBlocked:
+        raise                                  # لم يُنفَّذ بعد — لا يُسجَّل
     except AppError:
+        record("unknown", 0, False)
         raise
     except Exception as e:
+        record("unknown", 0, False)
         raise http_error("executeFailed", detail=str(e))
+
+    record("read" if res.kind == "rows" else "write",
+           len(res.rows) if res.kind == "rows" else res.affected, True)
     return asdict(res)
 
 
@@ -223,3 +243,74 @@ async def query_generate(body: GenerateIn):
     return {"sql": sql, "sql_class": sql_class,
             "provider": provider.id, "model": body.model,
             "is_local": provider.is_local}
+
+
+# ---------- سجل الاستعلامات ----------
+
+@router.get("/history")
+def history_list(limit: int = 50, favorites_only: bool = False):
+    return state.history.list(limit=limit, favorites_only=favorites_only)
+
+
+class FavoriteIn(BaseModel):
+    favorite: bool
+
+
+@router.patch("/history/{entry_id}")
+def history_favorite(entry_id: int, body: FavoriteIn):
+    state.history.set_favorite(entry_id, body.favorite)
+    return {"success": True}
+
+
+@router.delete("/history/{entry_id}")
+def history_delete(entry_id: int):
+    state.history.delete(entry_id)
+    return {"success": True}
+
+
+@router.delete("/history")
+def history_clear(keep_favorites: bool = True):
+    removed = state.history.clear(keep_favorites=keep_favorites)
+    return {"success": True, "removed": removed}
+
+
+# ---------- الاتصالات المحفوظة ----------
+
+@router.get("/connections")
+def connections_list():
+    return state.connections.list()
+
+
+class ConnectionIn(BaseModel):
+    name: str
+    type: str
+    sqlite_file: str = ""
+    host: str = ""
+    port: str = ""
+    database: str = ""
+    username: str = ""
+    password: str = ""
+
+
+@router.post("/connections")
+def connections_add(body: ConnectionIn):
+    return state.connections.add(**body.model_dump())
+
+
+@router.delete("/connections/{conn_id}")
+def connections_delete(conn_id: str):
+    state.connections.delete(conn_id)
+    return {"success": True}
+
+
+@router.post("/connections/{conn_id}/connect")
+def connections_connect(conn_id: str):
+    url = state.connections.build_url(conn_id)
+    try:
+        state.db.connect(url)
+    except AppError:
+        raise
+    except Exception as e:
+        raise http_error("connectFailed", detail=str(e))
+    return {"success": True, "dialect": state.db.dialect,
+            "tables": [t["name"] for t in state.db.schema_tables()]}

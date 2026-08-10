@@ -75,8 +75,9 @@ export const api = {
   schema: () => request('/api/db/schema').then(r => j<{ tables: TableSchema[] }>(r)),
   generate: (nlRequest: string, provider: string, model: string) =>
     post('/api/query/generate', { request: nlRequest, provider, model }).then(r => j<GenerateResult>(r)),
-  execute: (sql: string, confirm_write = false) =>
-    post('/api/db/execute', { sql, confirm_write }).then(r => j<ExecResult>(r)),
+  execute: (sql: string, confirm_write = false,
+            meta: { source?: 'editor' | 'nl'; request?: string; model?: string } = {}) =>
+    post('/api/db/execute', { sql, confirm_write, ...meta }).then(r => j<ExecResult>(r)),
 
   tableRows: (table: string, opts: { limit?: number; offset?: number; orderBy?: string; dir?: 'asc' | 'desc' } = {}) => {
     const q = new URLSearchParams();
@@ -122,6 +123,42 @@ export const api = {
   reportDelete: (id: string) =>
     request(`/api/reports/${id}`, { method: 'DELETE' }).then(r => j<{ success: boolean }>(r)),
   reportFileUrl: (id: string, kind: 'html' | 'pdf' | 'xlsx') => `/api/reports/${id}/${kind}`,
+  reportAnalyzeTable: (table: string) =>
+    post('/api/reports/analyze-table', { table })
+      .then(r => j<{ token: string; profile: ReportProfile }>(r)),
+
+  historyList: (favoritesOnly = false, limit = 50) =>
+    request(`/api/history?limit=${limit}&favorites_only=${favoritesOnly}`)
+      .then(r => j<HistoryEntry[]>(r)),
+  historyFavorite: (id: number, favorite: boolean) =>
+    request(`/api/history/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ favorite }),
+    }).then(r => j<{ success: boolean }>(r)),
+  historyDelete: (id: number) =>
+    request(`/api/history/${id}`, { method: 'DELETE' }).then(r => j<{ success: boolean }>(r)),
+  historyClear: () =>
+    request('/api/history', { method: 'DELETE' })
+      .then(r => j<{ success: boolean; removed: number }>(r)),
+
+  connectionsList: () => request('/api/connections').then(r => j<SavedConnection[]>(r)),
+  connectionAdd: (body: Omit<SavedConnection, 'id' | 'has_password'> & { password?: string }) =>
+    post('/api/connections', body).then(r => j<SavedConnection>(r)),
+  connectionDelete: (id: string) =>
+    request(`/api/connections/${id}`, { method: 'DELETE' }).then(r => j<{ success: boolean }>(r)),
+  connectionUse: (id: string) =>
+    post(`/api/connections/${id}/connect`, {})
+      .then(r => j<{ success: boolean; dialect: string; tables: string[] }>(r)),
+};
+
+export type HistoryEntry = {
+  id: number; request: string | null; sql: string; sql_class: string;
+  source: string; model: string | null; rows: number; success: boolean;
+  created_at: string; favorite: boolean;
+};
+export type SavedConnection = {
+  id: string; name: string; type: string; sqlite_file: string; host: string;
+  port: string; database: string; username: string; has_password: boolean;
 };
 
 export type ReportProfile = {

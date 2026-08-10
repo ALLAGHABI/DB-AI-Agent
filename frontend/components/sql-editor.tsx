@@ -11,11 +11,14 @@ import { api, type ExecResult } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ConfirmWriteDialog } from './confirm-write-dialog';
+import { ResultsChart } from './results-chart';
 import { ResultsTable } from './results-table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function SqlEditor({ connected }: { connected: boolean }) {
   const t = useTranslations('sqlEditor');
   const tq = useTranslations('query');
+  const tc = useTranslations('chart');
   const { theme } = useTheme();
   const { showError } = useApiError();
   const [code, setCode] = useState('SELECT * FROM ');
@@ -27,7 +30,7 @@ export function SqlEditor({ connected }: { connected: boolean }) {
     if (!code.trim()) return;
     setBusy(true);
     try {
-      const res = await api.execute(code.trim(), confirm);
+      const res = await api.execute(code.trim(), confirm, { source: 'editor' });
       setResult(res);
       if (res.kind === 'affected') toast.success(tq('affectedCount', { count: res.affected }));
     } catch (e) {
@@ -59,7 +62,20 @@ export function SqlEditor({ connected }: { connected: boolean }) {
               <Play className="h-4 w-4" />{busy ? t('running') : t('run')}
             </Button>
           </div>
-          {result?.kind === 'rows' && <ResultsTable columns={result.columns} rows={result.rows} />}
+          {result?.kind === 'rows' && (
+            <Tabs defaultValue="data">
+              <TabsList>
+                <TabsTrigger value="data">{tq('results')}</TabsTrigger>
+                <TabsTrigger value="chart">{tc('title')}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="data" className="pt-3">
+                <ResultsTable columns={result.columns} rows={result.rows} />
+              </TabsContent>
+              <TabsContent value="chart" className="pt-3">
+                <ResultsChart columns={result.columns} rows={result.rows} />
+              </TabsContent>
+            </Tabs>
+          )}
           {result?.kind === 'affected' && (
             <div className="py-4 text-center text-sm">{tq('affectedCount', { count: result.affected })}</div>
           )}

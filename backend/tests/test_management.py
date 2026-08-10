@@ -202,3 +202,46 @@ def test_no_arabic_prose_in_api_errors(client, sample_db):
     for r in responses:
         text = r.text
         assert not any("؀" <= ch <= "ۿ" for ch in text), text[:200]
+
+
+def test_execute_records_history(client, sample_db):
+    client.post("/api/db/connect", json={"url": f"sqlite:///{sample_db}"})
+    client.post("/api/db/execute", json={
+        "sql": "SELECT name FROM products", "source": "nl",
+        "request": "أعطني المنتجات", "model": "ollama/gemma3:4b"})
+    entries = client.get("/api/history").json()
+    assert len(entries) == 1
+    e = entries[0]
+    assert e["sql"] == "SELECT name FROM products"
+    assert e["request"] == "أعطني المنتجات" and e["source"] == "nl"
+    assert e["rows"] == 3 and e["success"] is True and e["favorite"] is False
+
+    # المفضلة والحذف عبر API
+    assert client.patch(f"/api/history/{e['id']}", json={"favorite": True}).json()["success"]
+    assert client.get("/api/history?favorites_only=true").json()[0]["id"] == e["id"]
+    assert client.delete(f"/api/history/{e['id']}").json()["success"]
+    assert client.get("/api/history").json() == []
+
+
+def test_blocked_write_is_not_recorded(client, sample_db):
+    client.post("/api/db/connect", json={"url": f"sqlite:///{sample_db}"})
+    client.post("/api/db/execute", json={"sql": "DELETE FROM products"})
+    assert client.get("/api/history").json() == []      # لم يُنفَّذ ⇒ لا يُسجَّل
+
+
+def test_failed_query_recorded_as_failure(client, sample_db):
+    client.post("/api/db/connect", json={"url": f"sqlite:///{sample_db}"})
+    client.post("/api/db/execute", json={"sql": "SELECT * FROM ghost_table"})
+    entries = client.get("/api/history").json()
+    assert len(entries) == 1 and entries[0]["success"] is False
+
+
+def test_saved_connection_endpoints(client, sample_db):
+    r = client.post("/api/connections", json={
+        "name": "متجر", "type": "sqlite", "sqlite_file": sample_db})
+    saved = r.json()
+    assert saved["has_password"] is False
+    r = client.post(f"/api/connections/{saved['id']}/connect")
+    assert r.json()["success"] is True and "products" in r.json()["tables"]
+    assert client.delete(f"/api/connections/{saved['id']}").json()["success"]
+    assert client.get("/api/connections").json() == []

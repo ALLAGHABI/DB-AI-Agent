@@ -4,13 +4,14 @@ import { useTranslations } from 'next-intl';
 import { ConnectionsPanel } from '@/components/connections-panel';
 import { ErDiagram } from '@/components/er-diagram';
 import { ProvidersPanel, type ModelSelection } from '@/components/providers-panel';
+import { HistoryPanel } from '@/components/history-panel';
 import { QueryWorkspace } from '@/components/query-workspace';
 import { ReportsStudio } from '@/components/reports-studio';
 import { Shell } from '@/components/shell';
 import { SqlEditor } from '@/components/sql-editor';
 import { TablesBrowser } from '@/components/tables-browser';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { api } from '@/lib/api';
+import { api, type HistoryEntry } from '@/lib/api';
 
 export default function Home() {
   const t = useTranslations('nav');
@@ -20,6 +21,19 @@ export default function Home() {
   const onModelChange = useCallback((s: ModelSelection | null) => setSelection(s), []);
 
   const [apiDown, setApiDown] = useState(false);
+  const [tab, setTab] = useState('query');
+  const [reuse, setReuse] = useState<{ request?: string; sql?: string } | null>(null);
+  const [reportTable, setReportTable] = useState<string | undefined>();
+
+  const onReuse = useCallback((entry: HistoryEntry) => {
+    setReuse(entry.request ? { request: entry.request } : { sql: entry.sql });
+    setTab('query');
+  }, []);
+
+  const onReportFromTable = useCallback((table: string) => {
+    setReportTable(table);
+    setTab('reports');
+  }, []);
 
   const syncStatus = useCallback(async () => {
     try {
@@ -49,19 +63,22 @@ export default function Home() {
         <ProvidersPanel onModelChange={onModelChange} />
       </>}
       main={
-        <Tabs defaultValue="query">
+        <Tabs value={tab} onValueChange={v => v && setTab(v)}>
           <TabsList className="mb-2">
             <TabsTrigger value="query">{t('query')}</TabsTrigger>
             <TabsTrigger value="tables">{t('tables')}</TabsTrigger>
             <TabsTrigger value="er">{t('er')}</TabsTrigger>
             <TabsTrigger value="sql">{t('sql')}</TabsTrigger>
             <TabsTrigger value="reports">{t('reports')}</TabsTrigger>
+            <TabsTrigger value="history">{t('history')}</TabsTrigger>
           </TabsList>
           <TabsContent value="query" className="space-y-4">
-            <QueryWorkspace connected={connected} selection={selection} />
+            <QueryWorkspace connected={connected} selection={selection}
+              initialRequest={reuse?.request} initialSql={reuse?.sql} />
           </TabsContent>
           <TabsContent value="tables">
-            <TablesBrowser tables={tables} dialect={dialect} onSchemaChanged={syncStatus} />
+            <TablesBrowser tables={tables} dialect={dialect} onSchemaChanged={syncStatus}
+              onReportFromTable={onReportFromTable} />
           </TabsContent>
           <TabsContent value="er">
             <ErDiagram connected={connected} />
@@ -69,8 +86,11 @@ export default function Home() {
           <TabsContent value="sql">
             <SqlEditor connected={connected} />
           </TabsContent>
+          <TabsContent value="history">
+            <HistoryPanel onReuse={onReuse} />
+          </TabsContent>
           <TabsContent value="reports">
-            <ReportsStudio selection={selection} />
+            <ReportsStudio selection={selection} tableToAnalyze={reportTable} />
           </TabsContent>
         </Tabs>
       }

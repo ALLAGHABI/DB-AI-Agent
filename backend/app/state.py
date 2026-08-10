@@ -1,5 +1,7 @@
 from .config import settings
+from .connections_store import ConnectionsStore
 from .db.manager import DatabaseManager
+from .history import QueryHistory
 from .llm.ollama import OllamaProvider
 from .llm.openai_compat import OpenAICompatProvider
 from .llm.openrouter import OpenRouterProvider
@@ -10,6 +12,8 @@ class AppState:
     def __init__(self):
         self.secrets = SecretsStore(settings.data_dir)
         self.db = DatabaseManager()
+        self.history = QueryHistory(settings.data_dir)
+        self.connections = ConnectionsStore(settings.data_dir)
 
     def providers(self) -> list:
         return [

@@ -99,7 +99,12 @@
     "saved": "Saved",
     "model": "Model",
     "ollamaMissing": "Ollama is not running — get it from ollama.com then: ollama pull gemma3",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "providerNames": {
+      "ollama": "Ollama (Local)",
+      "openai_compat": "OpenAI-compatible local server",
+      "openrouter": "OpenRouter (Cloud)"
+    }
   },
   "reports": {
     "title": "Reports Studio",

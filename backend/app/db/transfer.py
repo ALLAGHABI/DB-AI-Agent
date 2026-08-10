@@ -11,16 +11,57 @@ from ..errors import AppError
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
-def read_upload(filename: str, data: bytes) -> pd.DataFrame:
+MAX_HEADER_SCAN = 6
+
+
+def _pick_header_row(preview: pd.DataFrame) -> int:
+    """يختار صف العناوين — ملفات Excel الواقعية تبدأ بعناوين وشعارات وصفوف فارغة."""
+    best, best_score = 0, -1.0
+    for i in range(min(MAX_HEADER_SCAN, len(preview))):
+        row = preview.iloc[i]
+        filled = row.notna().sum()
+        if not filled:
+            continue
+        texts = sum(1 for v in row if isinstance(v, str) and v.strip())
+        unique = row.dropna().astype(str).nunique()
+        score = filled + texts * 0.5 + unique * 0.5
+        if score > best_score:
+            best, best_score = i, score
+    return best
+
+
+def _clean_frame(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.dropna(axis=1, how="all").dropna(axis=0, how="all")
+    df.columns = [str(c).strip() for c in df.columns]
+    keep = [c for c in df.columns if not c.lower().startswith("unnamed")]
+    return df[keep] if keep else df
+
+
+def read_upload(filename: str, data: bytes) -> dict:
+    """يقرأ الملف ويعيد {اسم الورقة: إطار} — ملفات Excel قد تحوي عدة أوراق."""
     if len(data) > MAX_UPLOAD_BYTES:
         raise AppError("fileTooLarge", limit="20MB")
     name = filename.lower()
+    base = filename.rsplit("/", 1)[-1].rsplit(".", 1)[0] or "data"
+
     if name.endswith(".csv"):
-        return pd.read_csv(io.BytesIO(data))
-    if name.endswith((".xlsx", ".xls")):
-        return pd.read_excel(io.BytesIO(data))
+        return {base: _clean_frame(pd.read_csv(io.BytesIO(data)))}
     if name.endswith(".json"):
-        return pd.read_json(io.BytesIO(data))
+        return {base: _clean_frame(pd.read_json(io.BytesIO(data)))}
+    if name.endswith((".xlsx", ".xls")):
+        book = pd.read_excel(io.BytesIO(data), sheet_name=None, header=None)
+        sheets: dict[str, pd.DataFrame] = {}
+        for sheet, raw in book.items():
+            if raw.empty:
+                continue
+            header = _pick_header_row(raw.head(MAX_HEADER_SCAN))
+            df = pd.read_excel(io.BytesIO(data), sheet_name=sheet, header=header)
+            df = _clean_frame(df)
+            if not df.empty and len(df.columns):
+                sheets[str(sheet).strip() or f"sheet{len(sheets) + 1}"] = df
+        if not sheets:
+            raise AppError("emptyFile")
+        return sheets
     raise AppError("unsupportedFormat")
 
 

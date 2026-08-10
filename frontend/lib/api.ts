@@ -162,6 +162,7 @@ export type AnalyzeResult = {
   token: string; profile: ReportProfile;
   semantics?: Record<string, Semantics>;
   labels?: Record<string, string>;
+  sheets?: string[];
 };
 
 export type ReportJob =
@@ -197,5 +198,5 @@ export type ReportMeta = {
   id: string; title: string; template: string; language: string;
   source_name: string; model_label: string; created_at: string; created_iso?: string;
   is_local: boolean; rows: number; cols: number; pdf: boolean;
-  language_ok?: boolean; dropped_claims?: number;
+  language_ok?: boolean; dropped_claims?: number; used_fallback?: boolean;
 };

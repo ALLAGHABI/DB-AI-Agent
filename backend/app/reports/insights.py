@@ -162,8 +162,12 @@ def strip_ungrounded(insights: dict, facts: list[str]) -> tuple[dict, list[str]]
 
 
 async def generate_insights(provider, model: str, facts: list[str], language: str,
-                            subject: str = "") -> dict:
-    """يولّد الرؤى ويفرض اللغة ويزيل أي رقم غير مدعوم بالحقائق."""
+                            subject: str = "", fallback: dict | None = None) -> dict:
+    """يولّد الرؤى ويفرض اللغة ويزيل أي رقم غير مدعوم بالحقائق.
+
+    `fallback` سرد محسوب من الأرقام؛ يحلّ محل رد النموذج إن خالف اللغة مرتين،
+    ويكمل النقص إن أغفل النتائج أو التوصيات — فلا يخرج تقرير ناقص أو بلغة خاطئة.
+    """
     system, user = build_insights_prompt(facts, language, subject)
     result = await provider.chat(model, system, user, temperature=0.2, max_tokens=1200)
     insights = parse_insights(result.text)
@@ -176,10 +180,22 @@ async def generate_insights(provider, model: str, facts: list[str], language: st
         result = await provider.chat(model, retry_system, user,
                                      temperature=0.1, max_tokens=1200)
         retried = parse_insights(result.text)
-        if language_matches(retried, language):
-            insights = retried
+        insights = retried if language_matches(retried, language) else insights
 
     insights, dropped = strip_ungrounded(insights, facts)
+    used_fallback = False
+
+    if fallback:
+        if not language_matches(insights, language):
+            insights = dict(fallback)               # النموذج عجز عن اللغة
+            used_fallback = True
+        else:                                        # نكمل ما أغفله فقط
+            for key in ("summary", "findings", "recommendations"):
+                if not insights.get(key) and fallback.get(key):
+                    insights[key] = fallback[key]
+                    used_fallback = True
+
     insights["language_ok"] = language_matches(insights, language)
     insights["dropped_claims"] = len(dropped)
+    insights["used_fallback"] = used_fallback
     return insights

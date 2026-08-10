@@ -291,3 +291,73 @@ def test_report_uses_labels_not_raw_column_names(client, tmp_path):
     assert "قيمة المبيعات" in html          # تسمية تلقائية
     assert "الفرع" in html                   # تسمية كتبها المستخدم
     assert "total_amount" not in html.split("<script")[0]   # لا أسماء خام في المتن
+
+
+def _multi_sheet_excel() -> bytes:
+    """ملف Excel واقعي: ورقتان، وعنوان تزييني قبل صف العناوين."""
+    import io
+
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "المبيعات"
+    ws.append(["تقرير الشركة الشهري"])          # صف تزييني
+    ws.append([])                                # صف فارغ
+    ws.append(["المدينة", "total_amount"])       # صف العناوين الحقيقي
+    for city, amount in [("الرياض", 500), ("جدة", 300), ("الرياض", 700)]:
+        ws.append([city, amount])
+
+    ws2 = wb.create_sheet("الموظفون")
+    ws2.append(["department", "salary"])
+    for dept, salary in [("IT", 9000), ("HR", 6000), ("IT", 11000)]:
+        ws2.append([dept, salary])
+
+    buf = io.BytesIO(); wb.save(buf)
+    return buf.getvalue()
+
+
+def test_all_excel_sheets_are_analyzed(client):
+    """ملف بعدة أوراق كان يُقرأ منه الأول فقط."""
+    r = client.post("/api/reports/analyze",
+                    files={"file": ("company.xlsx", _multi_sheet_excel(), "application/x")},
+                    data={"language": "ar"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert set(body["sheets"]) == {"المبيعات", "الموظفون"}
+    assert body["profile"]["kind"] == "multi"
+    assert body["profile"]["overview"]["tables"] == 2
+    assert body["profile"]["overview"]["rows"] == 6          # 3 + 3
+
+
+def test_decorative_rows_do_not_become_headers(client):
+    """صف العنوان التزييني كان يصير أسماء أعمدة مشوّهة."""
+    body = client.post("/api/reports/analyze",
+                       files={"file": ("company.xlsx", _multi_sheet_excel(), "application/x")},
+                       data={"language": "ar"}).json()
+    sales = next(d for d in body["profile"]["datasets"] if d["name"] == "المبيعات")
+    columns = {c["name"] for c in sales["profile"]["columns"]}
+    assert columns == {"المدينة", "total_amount"}
+    assert body["labels"]["total_amount"] == "قيمة المبيعات"
+
+
+@respx.mock
+def test_report_stays_arabic_when_model_answers_in_english(client):
+    """النموذج العنيد لم يعد يُخرج تقريراً إنجليزياً على مستخدم عربي."""
+    english = "## SUMMARY\nThis report analyzes employee working hours and costs.\n"
+    respx.get("http://localhost:11434/api/tags").mock(
+        return_value=Response(200, json={"models": [{"name": "gemma3:4b"}]}))
+    respx.post("http://localhost:11434/api/chat").mock(
+        return_value=Response(200, json={"message": {"content": english}}))
+
+    token = client.post("/api/reports/analyze",
+                        files={"file": ("company.xlsx", _multi_sheet_excel(), "application/x")},
+                        data={"language": "ar"}).json()["token"]
+    _, status = _generate(client, token=token, title="تقرير", template="executive",
+                          language="ar", provider="ollama", model="gemma3:4b")
+    assert status["status"] == "done", status
+    meta = status["report"]
+    assert meta["language_ok"] is True and meta["used_fallback"] is True
+
+    html = client.get(f"/api/reports/{meta['id']}/html").text
+    assert "This report analyzes" not in html
+    assert "يغطي هذا التقرير" in html

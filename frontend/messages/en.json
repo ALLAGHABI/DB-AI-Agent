@@ -203,7 +203,9 @@
     "droppedWarn": "{count} statements citing numbers absent from your data were removed",
     "languageWarn": "The model did not honour the requested report language",
     "labelsTitle": "Column names in the report",
-    "labelsHint": "This is how they will appear — rename as you like"
+    "labelsHint": "This is how they will appear — rename as you like",
+    "sheetsFound": "{count} sheets found in the file — all included",
+    "fallbackNote": "The model could not write part of the report, so it was composed from your numbers"
   },
   "errors": {
     "generic": "An unexpected error occurred",

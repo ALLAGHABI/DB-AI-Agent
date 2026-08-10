@@ -151,7 +151,8 @@ async def db_import(file: UploadFile = File(...), table: str = Form(...),
     _require_connection()
     data = await file.read()
     try:
-        df = transfer.read_upload(file.filename or "upload", data)
+        sheets = transfer.read_upload(file.filename or "upload", data)
+        df = next(iter(sheets.values()))        # الاستيراد يستهدف جدولاً واحداً
         inserted = transfer.import_df(state.db, df, table, mode)
     except AppError:
         raise

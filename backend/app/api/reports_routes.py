@@ -12,6 +12,7 @@ from ..reports.analyzer import MAX_DATASETS, profile_datasets, profile_df
 from ..reports.business import analyze_business, facts_from_business
 from ..reports.builder import build_report_html
 from ..reports.labels import label_columns
+from ..reports.narrative import compose_narrative
 from ..reports.insights import generate_insights
 from ..reports.store import ReportStore
 from ..config import settings
@@ -86,19 +87,29 @@ def analyze_tables(body: AnalyzeTablesIn):
 async def analyze(file: UploadFile = File(...), language: str = Form("ar")):
     data = await file.read()
     try:
-        df = transfer.read_upload(file.filename or "upload", data)
+        sheets = transfer.read_upload(file.filename or "upload", data)
     except AppError:
         raise
     except Exception as e:
         raise http_error("fileReadFailed", detail=str(e))
-    if df.empty:
+    sheets = {k: v for k, v in sheets.items() if not v.empty}
+    if not sheets:
         raise http_error("emptyFile")
-    profile = profile_df(df)
-    token = _store().save_temp(df, file.filename or "upload")
-    name = file.filename or "upload"
-    return {"token": token, "profile": profile,
-            "semantics": {name: analyze_business(df)["semantics"]},
-            "labels": label_columns([str(c) for c in df.columns], language)}
+
+    semantics = {name: analyze_business(df)["semantics"] for name, df in sheets.items()}
+    all_columns = sorted({str(c) for df in sheets.values() for c in df.columns})
+    labels = label_columns(all_columns + list(sheets), language)
+    source = file.filename or "upload"
+
+    if len(sheets) == 1:
+        name, df = next(iter(sheets.items()))
+        return {"token": _store().save_temp(df, name), "profile": profile_df(df),
+                "semantics": semantics, "labels": labels, "sheets": list(sheets)}
+
+    # ملف متعدد الأوراق ⇒ تقرير مركّب، ورقة لكل قسم
+    return {"token": _store().save_temp(sheets, source),
+            "profile": profile_datasets(sheets),
+            "semantics": semantics, "labels": labels, "sheets": list(sheets)}
 
 
 class GenerateIn(BaseModel):
@@ -148,9 +159,12 @@ def generate(body: GenerateIn):
             facts.extend(facts_from_business(b, label, labels))
         profile = {**profile, "business": business}
 
+        fallback = compose_narrative(business, labels, body.language,
+                                     subject=labels.get(source_name, source_name))
         try:
             insights = asyncio.run(generate_insights(
-                provider, body.model, facts, body.language, subject=source_name))
+                provider, body.model, facts, body.language,
+                subject=source_name, fallback=fallback))
         except AppError:
             raise
         except Exception as e:
@@ -175,6 +189,7 @@ def generate(body: GenerateIn):
             "title": body.title, "template": body.template, "language": body.language,
             "language_ok": insights.get("language_ok", True),
             "dropped_claims": insights.get("dropped_claims", 0),
+            "used_fallback": insights.get("used_fallback", False),
             "source_name": source_name, "model_label": model_label,
             "created_at": created_at, "created_iso": now.isoformat(),
             "is_local": provider.is_local,

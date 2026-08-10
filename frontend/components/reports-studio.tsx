@@ -51,6 +51,7 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
   const [semantics, setSemantics] = useState<Record<string, Semantics>>({});
   const [overrides, setOverrides] = useState<Record<string, SemanticOverride>>({});
   const [labels, setLabels] = useState<Record<string, string>>({});
+  const [sheets, setSheets] = useState<string[]>([]);
 
   // الأعمدة التي ستظهر فعلاً في التقرير — هي وحدها تستحق إعادة تسمية
   const usedColumns = Object.entries(semantics).flatMap(([table, sem]) => {
@@ -71,6 +72,7 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
       setProfile(res.profile);
       setSemantics(res.semantics ?? {});
       setLabels(res.labels ?? {});
+      setSheets([]);
       setOverrides({});
       const label = names.length === 1 ? names[0] : t('allTables');
       setSourceName(label);
@@ -97,6 +99,7 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
       setProfile(res.profile);
       setSemantics(res.semantics ?? {});
       setLabels(res.labels ?? {});
+      setSheets(res.sheets ?? []);
       setOverrides({});
       setSourceName(file.name);
       if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
@@ -132,6 +135,7 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
           toast.warning(t('droppedWarn', { count: job.report.dropped_claims }));
         }
         if (job.report.language_ok === false) toast.warning(t('languageWarn'));
+        else if (job.report.used_fallback) toast.info(t('fallbackNote'));
         setTab('archive');
         return;
       }
@@ -254,6 +258,19 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
                   </div>
                 ))}
               </div>
+              {sheets.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    {t('sheetsFound', { count: sheets.length })}
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sheets.map(s => (
+                      <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 {profile.kind === 'multi' && (
                   <Label className="text-xs text-muted-foreground">{t('perTable')}</Label>

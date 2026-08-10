@@ -18,10 +18,11 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { ModelSelection } from './providers-panel';
 
-export function ReportsStudio({ selection, tableToAnalyze }: {
-  selection: ModelSelection | null; tableToAnalyze?: string;
+export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
+  selection: ModelSelection | null; tableToAnalyze?: string; tables?: string[];
 }) {
   const t = useTranslations('reports');
   const locale = useLocale();
@@ -39,23 +40,29 @@ export function ReportsStudio({ selection, tableToAnalyze }: {
   const [reports, setReports] = useState<ReportMeta[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [tab, setTab] = useState('new');
+  const [pickedTable, setPickedTable] = useState('');
+
+  const analyzeTable = async (table: string) => {
+    if (!table) return;
+    setAnalyzing(true);
+    setProfile(null); setToken(null);
+    try {
+      const res = await api.reportAnalyzeTable(table);
+      setToken(res.token);
+      setProfile(res.profile);
+      setSourceName(table);
+      setTitle(table);
+    } catch (e) { showError(e); } finally { setAnalyzing(false); }
+  };
 
   useEffect(() => { api.reportsList().then(setReports).catch(showError); }, [showError]);
 
   // تحليل جدول متصل مباشرة (زر "تقرير من هذا الجدول")
   useEffect(() => {
     if (!tableToAnalyze) return;
-    setAnalyzing(true);
-    setProfile(null); setToken(null);
-    api.reportAnalyzeTable(tableToAnalyze)
-      .then(res => {
-        setToken(res.token);
-        setProfile(res.profile);
-        setSourceName(tableToAnalyze);
-        setTitle(tableToAnalyze);
-      })
-      .catch(showError)
-      .finally(() => setAnalyzing(false));
+    setTab('new');
+    analyzeTable(tableToAnalyze);
   }, [tableToAnalyze]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const analyze = async (file: File) => {
@@ -84,6 +91,7 @@ export function ReportsStudio({ selection, tableToAnalyze }: {
       });
       setReports(r => [meta, ...r]);
       toast.success(t('generated'));
+      setTab('archive');
     } catch (e) {
       showError(e);
     } finally {
@@ -102,7 +110,13 @@ export function ReportsStudio({ selection, tableToAnalyze }: {
   };
 
   return (
-    <div className="space-y-4">
+    <Tabs value={tab} onValueChange={v => v && setTab(v)} className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="new">{t('newTab')}</TabsTrigger>
+        <TabsTrigger value="archive">{t('archiveTab')}</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="new">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">{t('title')}</CardTitle>
@@ -125,6 +139,28 @@ export function ReportsStudio({ selection, tableToAnalyze }: {
           <input ref={fileRef} type="file" hidden accept=".csv,.xlsx,.xls,.json"
             onChange={e => e.target.files?.[0] && analyze(e.target.files[0])} />
           {!selection && <p className="text-xs text-destructive">{t('needModel')}</p>}
+
+          {tables.length > 0 && (
+            <div className="flex flex-wrap items-end gap-2 border-t pt-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('fromTable')}</Label>
+                <Select value={pickedTable} onValueChange={v => v && setPickedTable(v)}>
+                  <SelectTrigger className="w-52 font-mono text-xs">
+                    <SelectValue placeholder={t('pickTable')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tables.map(tb => (
+                      <SelectItem key={tb} value={tb} className="font-mono text-xs">{tb}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="secondary" size="sm" disabled={!pickedTable || analyzing}
+                onClick={() => analyzeTable(pickedTable)}>
+                {t('analyzeTable')}
+              </Button>
+            </div>
+          )}
 
           {profile && (
             <>
@@ -184,11 +220,36 @@ export function ReportsStudio({ selection, tableToAnalyze }: {
                 </div>
               </div>
               {!selection && <p className="text-xs text-destructive">{t('needModel')}</p>}
+
+          {tables.length > 0 && (
+            <div className="flex flex-wrap items-end gap-2 border-t pt-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('fromTable')}</Label>
+                <Select value={pickedTable} onValueChange={v => v && setPickedTable(v)}>
+                  <SelectTrigger className="w-52 font-mono text-xs">
+                    <SelectValue placeholder={t('pickTable')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tables.map(tb => (
+                      <SelectItem key={tb} value={tb} className="font-mono text-xs">{tb}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="secondary" size="sm" disabled={!pickedTable || analyzing}
+                onClick={() => analyzeTable(pickedTable)}>
+                {t('analyzeTable')}
+              </Button>
+            </div>
+          )}
             </>
           )}
         </CardContent>
       </Card>
 
+      </TabsContent>
+
+      <TabsContent value="archive">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">{t('archive')}</CardTitle>
@@ -245,6 +306,8 @@ export function ReportsStudio({ selection, tableToAnalyze }: {
         </CardContent>
       </Card>
 
+      </TabsContent>
+
       <Dialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>{t('deleteConfirm')}</DialogTitle></DialogHeader>
@@ -254,6 +317,6 @@ export function ReportsStudio({ selection, tableToAnalyze }: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Tabs>
   );
 }

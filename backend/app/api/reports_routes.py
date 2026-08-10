@@ -99,49 +99,71 @@ class GenerateIn(BaseModel):
 
 
 @router.post("/generate")
-async def generate(body: GenerateIn):
+def generate(body: GenerateIn):
+    """يبدأ التوليد كمهمة خلفية ويعيد معرّفها فوراً.
+
+    التوليد المحلي قد يتجاوز 30 ثانية (نموذج + PDF)، وأي وسيط HTTP بينهما
+    يقطع الطلب الطويل — فنفصل بدء العمل عن انتظار نتيجته.
+    """
     store = _store()
-    saved = store.load_temp(body.token)
-    frames, source_name = saved["frames"], saved["source_name"]
-    if saved["kind"] == "multi":
-        profile = profile_datasets(frames, saved.get("relationships"))
-    else:
-        profile = profile_df(next(iter(frames.values())))
+    saved = store.load_temp(body.token)          # يفشل فوراً إن انتهت الجلسة
     try:
         provider = state.provider_by_id(body.provider)
     except KeyError:
         raise http_error("unknownProvider", provider=body.provider)
-    try:
-        insights = await generate_insights(provider, body.model, profile, body.language)
-    except Exception as e:
-        raise http_error("insightsFailed", 502, detail=str(e))
 
-    now = datetime.datetime.now().astimezone()
-    created_at = now.strftime("%Y-%m-%d %H:%M")
-    created_iso = now.isoformat()
-    model_label = f"{provider.id}/{body.model}"
-    html = build_report_html(
-        title=body.title, profile=profile, insights=insights,
-        language=body.language, variant=body.template,
-        source_name=source_name, model_label=model_label,
-        created_at=created_at)
-    xlsx = exporter.to_xlsx(profile, insights, body.language)
-    try:
-        # Playwright السنكروني لا يعمل داخل حلقة asyncio — ننقله إلى thread
-        pdf = await asyncio.to_thread(exporter.to_pdf, html)
-    except Exception as e:
-        print(f"PDF export failed: {e}")
-        pdf = None
+    def work() -> dict:
+        frames, source_name = saved["frames"], saved["source_name"]
+        if saved["kind"] == "multi":
+            profile = profile_datasets(frames, saved.get("relationships"))
+        else:
+            profile = profile_df(next(iter(frames.values())))
 
-    meta = {
-        "title": body.title, "template": body.template, "language": body.language,
-        "source_name": source_name, "model_label": model_label,
-        "created_at": created_at, "created_iso": created_iso,
-        "is_local": provider.is_local,
-        "rows": profile["overview"]["rows"], "cols": profile["overview"]["cols"],
-    }
-    report_id = store.create(meta, html, xlsx, pdf)
-    return {**meta, "id": report_id, "pdf": pdf is not None}
+        try:
+            insights = asyncio.run(
+                generate_insights(provider, body.model, profile, body.language))
+        except AppError:
+            raise
+        except Exception as e:
+            raise AppError("insightsFailed", 502, detail=str(e))
+
+        now = datetime.datetime.now().astimezone()
+        created_at = now.strftime("%Y-%m-%d %H:%M")
+        model_label = f"{provider.id}/{body.model}"
+        html = build_report_html(
+            title=body.title, profile=profile, insights=insights,
+            language=body.language, variant=body.template,
+            source_name=source_name, model_label=model_label,
+            created_at=created_at)
+        xlsx = exporter.to_xlsx(profile, insights, body.language)
+        try:
+            pdf = exporter.to_pdf(html)
+        except Exception as e:
+            print(f"PDF export failed: {e}")
+            pdf = None
+
+        meta = {
+            "title": body.title, "template": body.template, "language": body.language,
+            "source_name": source_name, "model_label": model_label,
+            "created_at": created_at, "created_iso": now.isoformat(),
+            "is_local": provider.is_local,
+            "rows": profile["overview"]["rows"], "cols": profile["overview"]["cols"],
+        }
+        report_id = store.create(meta, html, xlsx, pdf)
+        return {**meta, "id": report_id, "pdf": pdf is not None}
+
+    return {"job_id": state.jobs.run(work), "status": "running"}
+
+
+@router.get("/jobs/{job_id}")
+def generate_status(job_id: str):
+    """حالة مهمة التوليد — running | done | failed."""
+    job = state.jobs.get(job_id)
+    if job["status"] == "failed":
+        return {"status": "failed", "error": job["error"]}
+    if job["status"] == "done":
+        return {"status": "done", "report": job["result"]}
+    return {"status": "running"}
 
 
 @router.get("")

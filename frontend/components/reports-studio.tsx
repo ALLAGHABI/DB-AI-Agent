@@ -7,7 +7,7 @@ import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useApiError } from '@/lib/use-api-error';
-import { api, type ReportMeta, type ReportProfile } from '@/lib/api';
+import { ApiError, api, type ReportMeta, type ReportProfile } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,13 +88,24 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
     if (!token || !selection) return;
     setGenerating(true);
     try {
-      const meta = await api.reportGenerate({
+      const { job_id } = await api.reportGenerate({
         token, title: title || sourceName, template, language,
         provider: selection.provider, model: selection.model,
       });
-      setReports(r => [meta, ...r]);
-      toast.success(t('generated'));
-      setTab('archive');
+      // التوليد المحلي قد يستغرق دقيقة — نستطلع الحالة بدل انتظار طلب طويل يُقطع
+      for (;;) {
+        await new Promise(r => setTimeout(r, 1500));
+        const job = await api.reportJob(job_id);
+        if (job.status === 'running') continue;
+        if (job.status === 'failed') {
+          showError(new ApiError(job.error.code, job.error.params ?? {}));
+          return;
+        }
+        setReports(r => [job.report, ...r]);
+        toast.success(t('generated'));
+        setTab('archive');
+        return;
+      }
     } catch (e) {
       showError(e);
     } finally {

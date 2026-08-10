@@ -1,3 +1,5 @@
+import time
+
 import pytest
 import respx
 from fastapi.testclient import TestClient
@@ -31,6 +33,20 @@ def client(tmp_path, monkeypatch):
     return TestClient(app)
 
 
+def _generate(client, **body):
+    """يبدأ التوليد وينتظر انتهاء المهمة الخلفية."""
+    r = client.post("/api/reports/generate", json=body)
+    if r.status_code != 200:
+        return r, None
+    job_id = r.json()["job_id"]
+    for _ in range(300):                      # حتى 30 ثانية
+        status = client.get(f"/api/reports/jobs/{job_id}").json()
+        if status["status"] != "running":
+            return r, status
+        time.sleep(0.1)
+    raise AssertionError("job did not finish")
+
+
 def _analyze(client):
     r = client.post("/api/reports/analyze",
                     files={"file": ("sales.csv", CSV, "text/csv")})
@@ -58,11 +74,11 @@ def test_generate_and_archive_lifecycle(client):
         return_value=Response(200, json={"message": {"content": FAKE_INSIGHTS}}))
 
     token = _analyze(client)["token"]
-    r = client.post("/api/reports/generate", json={
-        "token": token, "title": "تقرير المبيعات", "template": "detailed",
-        "language": "ar", "provider": "ollama", "model": "gemma3:4b"})
-    assert r.status_code == 200, r.text
-    meta = r.json()
+    _, status = _generate(client, token=token, title="تقرير المبيعات",
+                          template="detailed", language="ar",
+                          provider="ollama", model="gemma3:4b")
+    assert status["status"] == "done", status
+    meta = status["report"]
     assert meta["is_local"] is True and meta["rows"] == 3
 
     # القائمة
@@ -150,11 +166,11 @@ def test_analyze_whole_database_multi_report(client, tmp_path):
         return_value=Response(200, json={"models": [{"name": "gemma3:4b"}]}))
     respx.post("http://localhost:11434/api/chat").mock(
         return_value=Response(200, json={"message": {"content": FAKE_INSIGHTS}}))
-    r = client.post("/api/reports/generate", json={
-        "token": r.json()["token"], "title": "تقرير القاعدة", "template": "detailed",
-        "language": "ar", "provider": "ollama", "model": "gemma3:4b"})
-    assert r.status_code == 200, r.text
-    meta = r.json()
+    _, status = _generate(client, token=r.json()["token"], title="تقرير القاعدة",
+                          template="detailed", language="ar",
+                          provider="ollama", model="gemma3:4b")
+    assert status["status"] == "done", status
+    meta = status["report"]
 
     html = client.get(f"/api/reports/{meta['id']}/html").text
     assert "cities" in html and "sales" in html          # قسم لكل جدول
@@ -190,3 +206,35 @@ def test_analyze_subset_of_tables(client, tmp_path):
     single = client.post("/api/reports/analyze-table",
                          json={"tables": ["a"]}).json()["profile"]
     assert single["kind"] == "single" and single["overview"]["rows"] == 2
+
+
+@respx.mock
+def test_generation_runs_as_a_background_job(client, tmp_path):
+    """التوليد يعيد معرّف مهمة فوراً — لا ينتظر النموذج ولا PDF."""
+    respx.get("http://localhost:11434/api/tags").mock(
+        return_value=Response(200, json={"models": [{"name": "gemma3:4b"}]}))
+    respx.post("http://localhost:11434/api/chat").mock(
+        return_value=Response(200, json={"message": {"content": FAKE_INSIGHTS}}))
+
+    token = _analyze(client)["token"]
+    r = client.post("/api/reports/generate", json={
+        "token": token, "title": "خلفية", "provider": "ollama", "model": "gemma3:4b"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "running" and r.json()["job_id"]
+
+    _, status = _generate(client, token=_analyze(client)["token"], title="خلفية2",
+                          provider="ollama", model="gemma3:4b")
+    assert status["status"] == "done" and status["report"]["id"]
+
+
+def test_job_failure_is_reported_with_a_code(client):
+    """فشل النموذج يصل كرمز خطأ مترجَم لا كنص خام."""
+    token = _analyze(client)["token"]
+    _, status = _generate(client, token=token, title="فشل",
+                          provider="ollama", model="missing-model")
+    assert status["status"] == "failed"
+    assert status["error"]["code"] == "insightsFailed"
+
+
+def test_unknown_job_is_404(client):
+    assert client.get("/api/reports/jobs/nope").status_code == 404

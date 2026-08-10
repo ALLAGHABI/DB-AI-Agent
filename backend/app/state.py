@@ -2,6 +2,7 @@ from .config import settings
 from .connections_store import ConnectionsStore
 from .db.manager import DatabaseManager
 from .history import QueryHistory
+from .jobs import JobStore
 from .llm.ollama import OllamaProvider
 from .llm.openai_compat import OpenAICompatProvider
 from .llm.openrouter import OpenRouterProvider
@@ -14,6 +15,7 @@ class AppState:
         self.db = DatabaseManager()
         self.history = QueryHistory(settings.data_dir)
         self.connections = ConnectionsStore(settings.data_dir)
+        self.jobs = JobStore()
 
     def providers(self) -> list:
         return [

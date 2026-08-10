@@ -118,7 +118,9 @@ export const api = {
   reportGenerate: (body: {
     token: string; title: string; template: string; language: string;
     provider: string; model: string;
-  }) => post('/api/reports/generate', body).then(r => j<ReportMeta>(r)),
+  }) => post('/api/reports/generate', body).then(r => j<{ job_id: string; status: string }>(r)),
+  reportJob: (jobId: string) =>
+    request(`/api/reports/jobs/${jobId}`).then(r => j<ReportJob>(r)),
   reportsList: () => request('/api/reports').then(r => j<ReportMeta[]>(r)),
   reportDelete: (id: string) =>
     request(`/api/reports/${id}`, { method: 'DELETE' }).then(r => j<{ success: boolean }>(r)),
@@ -150,6 +152,11 @@ export const api = {
     post(`/api/connections/${id}/connect`, {})
       .then(r => j<{ success: boolean; dialect: string; tables: string[] }>(r)),
 };
+
+export type ReportJob =
+  | { status: 'running' }
+  | { status: 'done'; report: ReportMeta }
+  | { status: 'failed'; error: { code: string; params?: Record<string, string> } };
 
 export type HistoryEntry = {
   id: number; request: string | null; sql: string; sql_class: string;

@@ -123,8 +123,8 @@ export const api = {
   reportDelete: (id: string) =>
     request(`/api/reports/${id}`, { method: 'DELETE' }).then(r => j<{ success: boolean }>(r)),
   reportFileUrl: (id: string, kind: 'html' | 'pdf' | 'xlsx') => `/api/reports/${id}/${kind}`,
-  reportAnalyzeTable: (table: string) =>
-    post('/api/reports/analyze-table', { table })
+  reportAnalyzeTables: (tables: string[]) =>
+    post('/api/reports/analyze-table', { tables })
       .then(r => j<{ token: string; profile: ReportProfile }>(r)),
 
   historyList: (favoritesOnly = false, limit = 50) =>
@@ -161,12 +161,20 @@ export type SavedConnection = {
   port: string; database: string; username: string; has_password: boolean;
 };
 
-export type ReportProfile = {
+export type SingleProfile = {
+  kind: 'single';
   overview: { rows: number; cols: number; missing_pct: number; duplicate_rows: number; memory_kb: number };
   columns: { name: string; kind: string; nulls: number; unique: number }[];
   correlations: { a: string; b: string; r: number }[];
   charts: { type: string; title: string }[];
 };
+export type MultiProfile = {
+  kind: 'multi';
+  overview: { tables: number; rows: number; cols: number; missing_pct: number; relationships: number };
+  datasets: { name: string; profile: SingleProfile }[];
+  relationships: { from: string; to: string }[];
+};
+export type ReportProfile = SingleProfile | MultiProfile;
 export type ReportMeta = {
   id: string; title: string; template: string; language: string;
   source_name: string; model_label: string; created_at: string; created_iso?: string;

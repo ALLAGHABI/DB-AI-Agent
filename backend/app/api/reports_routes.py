@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from ..db import transfer
 from ..reports import exporter
-from ..reports.analyzer import profile_df
+from ..reports.analyzer import MAX_DATASETS, profile_datasets, profile_df
 from ..reports.builder import build_report_html
 from ..reports.insights import generate_insights
 from ..reports.store import ReportStore
@@ -23,22 +23,53 @@ def _store() -> ReportStore:
     return ReportStore(settings.data_dir)
 
 
-class AnalyzeTableIn(BaseModel):
-    table: str
+MAX_TABLE_ROWS = 100_000
+
+
+class AnalyzeTablesIn(BaseModel):
+    tables: list[str] = []          # فارغة = كل جداول القاعدة
 
 
 @router.post("/analyze-table")
-def analyze_table(body: AnalyzeTableIn):
-    """تحليل جدول متصل مباشرة — بلا تصدير ورفع يدوي."""
+def analyze_tables(body: AnalyzeTablesIn):
+    """تحليل جدول أو عدة جداول أو القاعدة كاملة — بلا تصدير ورفع يدوي."""
     if not state.db.is_connected:
         raise http_error("notConnected")
     import pandas as pd
-    data = state.db.browse_rows(body.table, limit=100000, offset=0)
-    df = pd.DataFrame(data["rows"], columns=data["columns"])
-    if df.empty:
-        raise http_error("emptyTable", table=body.table)
-    profile = profile_df(df)
-    token = _store().save_temp(df, body.table)
+
+    schema = state.db.schema_tables()
+    known = [t["name"] for t in schema]
+    wanted = body.tables or known
+    unknown = [t for t in wanted if t not in known]
+    if unknown:
+        raise http_error("tableMissing", 404, table=unknown[0])
+    if not wanted:
+        raise http_error("noTablesToAnalyze")
+
+    frames: dict[str, pd.DataFrame] = {}
+    for name in wanted[:MAX_DATASETS]:
+        data = state.db.browse_rows(name, limit=MAX_TABLE_ROWS, offset=0)
+        frames[name] = pd.DataFrame(data["rows"], columns=data["columns"])
+
+    if all(df.empty for df in frames.values()):
+        raise http_error("emptyTable", table=wanted[0])
+
+    # العلاقات بين الجداول المختارة فقط
+    relationships = [
+        {"from": f"{t['name']}.{','.join(fk['constrained_columns'])}",
+         "to": f"{fk['referred_table']}.{','.join(fk['referred_columns'])}"}
+        for t in schema if t["name"] in frames
+        for fk in t["foreign_keys"] if fk["referred_table"] in frames
+    ]
+
+    if len(frames) == 1:
+        name, df = next(iter(frames.items()))
+        profile = profile_df(df)
+        return {"token": _store().save_temp(df, name), "profile": profile}
+
+    profile = profile_datasets(frames, relationships)
+    source = state.db.dialect or "database"
+    token = _store().save_temp(frames, source, relationships)
     return {"token": token, "profile": profile}
 
 
@@ -70,9 +101,12 @@ class GenerateIn(BaseModel):
 @router.post("/generate")
 async def generate(body: GenerateIn):
     store = _store()
-    df, source_name = store.load_temp(body.token)
-
-    profile = profile_df(df)
+    saved = store.load_temp(body.token)
+    frames, source_name = saved["frames"], saved["source_name"]
+    if saved["kind"] == "multi":
+        profile = profile_datasets(frames, saved.get("relationships"))
+    else:
+        profile = profile_df(next(iter(frames.values())))
     try:
         provider = state.provider_by_id(body.provider)
     except KeyError:

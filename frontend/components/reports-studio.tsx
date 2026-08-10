@@ -1,6 +1,7 @@
 'use client';
 import {
-  Cloud, Cpu, Download, ExternalLink, FileSpreadsheet, FileText, Sparkles, Trash2, Upload,
+  Cloud, Cpu, Database, Download, ExternalLink, FileBarChart, FileSpreadsheet,
+  FileText, Sparkles, Trash2, Upload,
 } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
@@ -41,18 +42,19 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState('new');
-  const [pickedTable, setPickedTable] = useState('');
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  const analyzeTable = async (table: string) => {
-    if (!table) return;
+  const analyzeTables = async (names: string[]) => {
+    if (!names.length) return;
     setAnalyzing(true);
     setProfile(null); setToken(null);
     try {
-      const res = await api.reportAnalyzeTable(table);
+      const res = await api.reportAnalyzeTables(names);
       setToken(res.token);
       setProfile(res.profile);
-      setSourceName(table);
-      setTitle(table);
+      const label = names.length === 1 ? names[0] : t('allTables');
+      setSourceName(label);
+      setTitle(label);
     } catch (e) { showError(e); } finally { setAnalyzing(false); }
   };
 
@@ -62,7 +64,8 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
   useEffect(() => {
     if (!tableToAnalyze) return;
     setTab('new');
-    analyzeTable(tableToAnalyze);
+    setPicked(new Set([tableToAnalyze]));
+    analyzeTables([tableToAnalyze]);
   }, [tableToAnalyze]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const analyze = async (file: File) => {
@@ -141,48 +144,96 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
           {!selection && <p className="text-xs text-destructive">{t('needModel')}</p>}
 
           {tables.length > 0 && (
-            <div className="flex flex-wrap items-end gap-2 border-t pt-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t('fromTable')}</Label>
-                <Select value={pickedTable} onValueChange={v => v && setPickedTable(v)}>
-                  <SelectTrigger className="w-52 font-mono text-xs">
-                    <SelectValue placeholder={t('pickTable')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tables.map(tb => (
-                      <SelectItem key={tb} value={tb} className="font-mono text-xs">{tb}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Database className="h-4 w-4 text-primary" aria-hidden />
+                  {t('fromTable')}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs"
+                    onClick={() => setPicked(new Set(tables))}>{t('selectAll')}</Button>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs"
+                    disabled={!picked.size}
+                    onClick={() => setPicked(new Set())}>{t('clearSel')}</Button>
+                </div>
               </div>
-              <Button variant="secondary" size="sm" disabled={!pickedTable || analyzing}
-                onClick={() => analyzeTable(pickedTable)}>
-                {t('analyzeTable')}
-              </Button>
+
+              <p className="text-xs text-muted-foreground">{t('pickTables')}</p>
+              <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+                {tables.map(tb => {
+                  const on = picked.has(tb);
+                  return (
+                    <button key={tb} type="button" aria-pressed={on}
+                      onClick={() => setPicked(s => {
+                        const next = new Set(s);
+                        if (next.has(tb)) next.delete(tb); else next.add(tb);
+                        return next;
+                      })}
+                      className={`cursor-pointer rounded-full border px-3 py-1 font-mono text-xs transition-colors
+                        ${on
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:border-primary hover:text-foreground'}`}>
+                      {tb}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button size="sm" className="gap-1.5" disabled={!picked.size || analyzing}
+                  onClick={() => analyzeTables([...picked])}>
+                  <FileBarChart className="h-3.5 w-3.5" />
+                  {t('analyzeSelected', { count: picked.size })}
+                </Button>
+                <Button variant="outline" size="sm" disabled={analyzing}
+                  onClick={() => { setPicked(new Set(tables)); analyzeTables(tables); }}>
+                  {t('analyzeAll')}
+                </Button>
+              </div>
             </div>
           )}
 
           {profile && (
             <>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[
+                {(profile.kind === 'multi' ? [
+                  [format.number(profile.overview.tables), t('tablesCount')],
+                  [format.number(profile.overview.rows), t('totalRows')],
+                  [format.number(profile.overview.cols), t('cols')],
+                  [format.number(profile.overview.relationships), t('relationships')],
+                ] : [
                   [format.number(profile.overview.rows), t('rows')],
                   [format.number(profile.overview.cols), t('cols')],
                   [format.number(profile.overview.missing_pct / 100, { style: 'percent', maximumFractionDigits: 2 }), t('missing')],
                   [format.number(profile.overview.duplicate_rows), t('duplicates')],
-                ].map(([v, l]) => (
+                ]).map(([v, l]) => (
                   <div key={l} className="rounded-lg border bg-muted/40 p-3 text-center">
                     <div className="text-xl font-bold tabular-nums">{v}</div>
                     <div className="text-xs text-muted-foreground">{l}</div>
                   </div>
                 ))}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {profile.columns.map(c => (
-                  <Badge key={c.name} variant="outline" className="font-mono text-xs">
-                    {c.name} <span className="text-muted-foreground">· {c.kind}</span>
-                  </Badge>
-                ))}
+              <div className="space-y-1.5">
+                {profile.kind === 'multi' && (
+                  <Label className="text-xs text-muted-foreground">{t('perTable')}</Label>
+                )}
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.kind === 'multi'
+                    ? profile.datasets.map(d => (
+                      <Badge key={d.name} variant="outline" className="font-mono text-xs">
+                        {d.name}
+                        <span className="text-muted-foreground">
+                          {' · '}{format.number(d.profile.overview.rows)}
+                        </span>
+                      </Badge>
+                    ))
+                    : profile.columns.map(c => (
+                      <Badge key={c.name} variant="outline" className="font-mono text-xs">
+                        {c.name} <span className="text-muted-foreground">· {c.kind}</span>
+                      </Badge>
+                    ))}
+                </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -222,24 +273,53 @@ export function ReportsStudio({ selection, tableToAnalyze, tables = [] }: {
               {!selection && <p className="text-xs text-destructive">{t('needModel')}</p>}
 
           {tables.length > 0 && (
-            <div className="flex flex-wrap items-end gap-2 border-t pt-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t('fromTable')}</Label>
-                <Select value={pickedTable} onValueChange={v => v && setPickedTable(v)}>
-                  <SelectTrigger className="w-52 font-mono text-xs">
-                    <SelectValue placeholder={t('pickTable')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tables.map(tb => (
-                      <SelectItem key={tb} value={tb} className="font-mono text-xs">{tb}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Database className="h-4 w-4 text-primary" aria-hidden />
+                  {t('fromTable')}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs"
+                    onClick={() => setPicked(new Set(tables))}>{t('selectAll')}</Button>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs"
+                    disabled={!picked.size}
+                    onClick={() => setPicked(new Set())}>{t('clearSel')}</Button>
+                </div>
               </div>
-              <Button variant="secondary" size="sm" disabled={!pickedTable || analyzing}
-                onClick={() => analyzeTable(pickedTable)}>
-                {t('analyzeTable')}
-              </Button>
+
+              <p className="text-xs text-muted-foreground">{t('pickTables')}</p>
+              <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+                {tables.map(tb => {
+                  const on = picked.has(tb);
+                  return (
+                    <button key={tb} type="button" aria-pressed={on}
+                      onClick={() => setPicked(s => {
+                        const next = new Set(s);
+                        if (next.has(tb)) next.delete(tb); else next.add(tb);
+                        return next;
+                      })}
+                      className={`cursor-pointer rounded-full border px-3 py-1 font-mono text-xs transition-colors
+                        ${on
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:border-primary hover:text-foreground'}`}>
+                      {tb}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button size="sm" className="gap-1.5" disabled={!picked.size || analyzing}
+                  onClick={() => analyzeTables([...picked])}>
+                  <FileBarChart className="h-3.5 w-3.5" />
+                  {t('analyzeSelected', { count: picked.size })}
+                </Button>
+                <Button variant="outline" size="sm" disabled={analyzing}
+                  onClick={() => { setPicked(new Set(tables)); analyzeTables(tables); }}>
+                  {t('analyzeAll')}
+                </Button>
+              </div>
             </div>
           )}
             </>

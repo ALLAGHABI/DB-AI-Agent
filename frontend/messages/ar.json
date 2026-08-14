@@ -142,8 +142,7 @@
       "ollama": "Ollama (محلي)",
       "openai_compat": "خادم محلي متوافق OpenAI",
       "openrouter": "OpenRouter (سحابي)"
-    },
-    "recommended": "موصى به"
+    }
   },
   "reports": {
     "title": "استوديو التقارير",

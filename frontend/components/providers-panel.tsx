@@ -139,10 +139,10 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
               onValueChange={m => m && setSelected({ ...selected, model: m })}>
               <SelectTrigger className="w-full font-mono text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {current.models.map((m, i) => (
+                {current.models.map(m => (
                   <SelectItem key={m} value={m} className="font-mono text-xs">
                     {m}
-                    {current.id === 'ollama' && i === 0 && (
+                    {m === current.recommended && (
                       <span className="ms-2 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-sans text-primary">
                         {t('recommended')}
                       </span>

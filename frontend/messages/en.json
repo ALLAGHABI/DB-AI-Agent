@@ -142,7 +142,8 @@
       "ollama": "Ollama (Local)",
       "openai_compat": "OpenAI-compatible local server",
       "openrouter": "OpenRouter (Cloud)"
-    }
+    },
+    "recommended": "Recommended"
   },
   "reports": {
     "title": "Reports Studio",

@@ -16,6 +16,15 @@ import {
 
 export type ModelSelection = { provider: string; model: string; isLocal: boolean };
 
+const STORE_KEY = 'smartdb.model';
+
+function loadStored(): ModelSelection | null {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    return raw ? (JSON.parse(raw) as ModelSelection) : null;
+  } catch { return null; }
+}
+
 export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSelection | null) => void }) {
   const t = useTranslations('settings');
   const { showError } = useApiError();
@@ -32,12 +41,17 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
       setProviders(ps);
       setHasOrKey(st.has_openrouter_api_key);
       setCompatUrl(st.openai_compat_url);
-      // اختيار افتراضي: أول مزود محلي متاح وأول نموذج له
+      // الأولوية: اختيار الجلسة، فآخر اختيار محفوظ، فأفضل نموذج محلي
+      // (الباكند يرتب القائمة بالأفضلية، فأولها هو الافتراضي الموصى به)
       setSelected(prev => {
-        if (prev) {
-          const p = ps.find(x => x.id === prev.provider);
-          if (p?.available && (p.models.includes(prev.model) || p.id === 'openrouter')) return prev;
-        }
+        const usable = (s: ModelSelection | null) => {
+          if (!s) return null;
+          const p = ps.find(x => x.id === s.provider);
+          return p?.available && (p.models.includes(s.model) || p.id === 'openrouter')
+            ? s : null;
+        };
+        const kept = usable(prev) ?? usable(loadStored());
+        if (kept) return kept;
         const local = ps.find(p => p.is_local && p.available && p.models.length);
         const any = local ?? ps.find(p => p.available && p.models.length);
         return any ? { provider: any.id, model: any.models[0], isLocal: any.is_local } : null;
@@ -48,7 +62,12 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
-  useEffect(() => { onModelChange(selected); }, [selected, onModelChange]);
+  useEffect(() => {
+    onModelChange(selected);
+    try {
+      if (selected) localStorage.setItem(STORE_KEY, JSON.stringify(selected));
+    } catch { /* التخزين المحلي رفاهية لا شرط */ }
+  }, [selected, onModelChange]);
 
   const saveSecrets = async () => {
     setBusy(true);
@@ -120,8 +139,15 @@ export function ProvidersPanel({ onModelChange }: { onModelChange: (s: ModelSele
               onValueChange={m => m && setSelected({ ...selected, model: m })}>
               <SelectTrigger className="w-full font-mono text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {current.models.map(m => (
-                  <SelectItem key={m} value={m} className="font-mono text-xs">{m}</SelectItem>
+                {current.models.map((m, i) => (
+                  <SelectItem key={m} value={m} className="font-mono text-xs">
+                    {m}
+                    {current.id === 'ollama' && i === 0 && (
+                      <span className="ms-2 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-sans text-primary">
+                        {t('recommended')}
+                      </span>
+                    )}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
